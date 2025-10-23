@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb
+
+# Data and models
+*.pth
+*.pt
+*.bin
+*.safetensors
+*.gguf
+
+# Benchmark results (keep example)
+benchmark_safe_*.json
+!benchmark_safe_20250816_105011.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local settings
+.claude/settings.local.json

@@ -1,0 +1,43 @@
+{
+  "timestamp": "2025-08-16T10:50:11.085805",
+  "device_info": {
+    "device_type": "cuda",
+    "device_name": "AMD Radeon Graphics",
+    "compute_capability": [
+      11,
+      5
+    ],
+    "total_memory_gb": 68.719476736,
+    "multi_processor_count": 20,
+    "system_memory_gb": 67.038736384,
+    "system_memory_available_gb": 63.275835392
+  },
+  "results": {
+    "matmul": {
+      "FP32_1024": {
+        "tflops": 7.966038077952589,
+        "time_per_iter_ms": 0.2695798873901367
+      },
+      "BF16_1024": {
+        "tflops": 11.113824732853343,
+        "time_per_iter_ms": 0.38645267486572266
+      },
+      "FP32_2048": {
+        "tflops": 7.500413133752251,
+        "time_per_iter_ms": 2.290523052215576
+      },
+      "BF16_2048": {
+        "tflops": 13.297273753417931,
+        "time_per_iter_ms": 2.5839686393737793
+      }
+    },
+    "memory": {
+      "unified_memory_enabled": true,
+      "max_allocated_gb": 32
+    },
+    "bandwidth": {
+      "write_bandwidth_gb_s": 157.62667658808454,
+      "copy_bandwidth_gb_s": 150.2814976182073
+    }
+  }
+}
