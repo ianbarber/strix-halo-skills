@@ -27,7 +27,7 @@ cp -r ~/Projects/amdtest/.claude .
 
 ```bash
 # Clone and copy skills
-git clone https://github.com/YOUR_USERNAME/strix-halo-skills.git /tmp/strix-skills
+git clone https://github.com/ianbarber/strix-halo-skills.git /tmp/strix-skills
 cp -r /tmp/strix-skills/.claude .
 ```
 
@@ -138,7 +138,7 @@ If your project is a git repo:
 
 ```bash
 cd your-project
-git submodule add https://github.com/YOUR_USERNAME/strix-halo-skills.git .strix-halo
+git submodule add https://github.com/ianbarber/strix-halo-skills.git .strix-halo
 ln -s .strix-halo/.claude/skills .claude/skills
 ```
 
@@ -280,10 +280,10 @@ When ready to share:
 ```bash
 cd ~/Projects/amdtest
 
-# Create repo on GitHub (YOUR_USERNAME/strix-halo-skills)
+# Create repo on GitHub (ianbarber/strix-halo-skills)
 
 # Add remote and push
-git remote add origin https://github.com/YOUR_USERNAME/strix-halo-skills.git
+git remote add origin https://github.com/ianbarber/strix-halo-skills.git
 git branch -M main
 git push -u origin main
 ```
@@ -291,7 +291,7 @@ git push -u origin main
 Then others can use:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/strix-halo-skills.git
+git clone https://github.com/ianbarber/strix-halo-skills.git
 cd strix-halo-skills
 ./setup_new_project.sh
 ```

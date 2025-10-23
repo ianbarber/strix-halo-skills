@@ -10,7 +10,7 @@ Copy the `.claude/skills/` directory to any project:
 
 ```bash
 # In your new project directory
-git clone https://github.com/YOUR_USERNAME/strix-halo-skills.git /tmp/strix-halo
+git clone https://github.com/ianbarber/strix-halo-skills.git /tmp/strix-halo
 cp -r /tmp/strix-halo/.claude/skills .claude/
 ```
 
@@ -22,7 +22,7 @@ Then in Claude Code:
 ### Option 2: Automated Script
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/strix-halo-skills.git
+git clone https://github.com/ianbarber/strix-halo-skills.git
 cd strix-halo-skills
 ./setup_new_project.sh
 ```
@@ -39,10 +39,10 @@ cd strix-halo-skills
 
 - **`setup_new_project.sh`** - Automated project setup
 - **`configure_gtt.sh`** - GTT memory configuration
-- **`test_memory.py`** - Memory capacity testing
-- **`test_gpu_simple.py`** - Quick GPU verification
-- **`amd_benchmark_safe.py`** - Performance benchmarking
-- **`test_llm_memory.py`** - LLM capacity testing
+- **`scripts/test_memory.py`** - Memory capacity testing
+- **`scripts/test_gpu_simple.py`** - Quick GPU verification
+- **`scripts/amd_benchmark_safe.py`** - Performance benchmarking
+- **`scripts/test_llm_memory.py`** - LLM capacity testing
 
 ### Documentation
 
@@ -89,14 +89,14 @@ cp -r /path/to/strix-halo-skills/.claude/skills .claude/
 
 ```bash
 cd your-project
-git submodule add https://github.com/YOUR_USERNAME/strix-halo-skills.git .strix-halo
+git submodule add https://github.com/ianbarber/strix-halo-skills.git .strix-halo
 ln -s .strix-halo/.claude/skills .claude/skills
 ```
 
 ### Method 3: Direct Clone and Copy
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/strix-halo-skills.git
+git clone https://github.com/ianbarber/strix-halo-skills.git
 cd strix-halo-skills
 ./setup_new_project.sh  # Creates new project with everything set up
 ```
@@ -130,9 +130,9 @@ Once you have the skills available:
 python -c "import torch; a=torch.tensor([1.0]).cuda(); print('✓ OK:', (a+1).item())"
 
 # Full test suite
-python test_gpu_simple.py
-python test_memory.py
-python amd_benchmark_safe.py --device cuda
+python scripts/test_gpu_simple.py
+python scripts/test_memory.py
+python scripts/amd_benchmark_safe.py --device cuda
 ```
 
 ## 📊 Expected Performance
@@ -148,16 +148,51 @@ python amd_benchmark_safe.py --device cuda
 | 30B Models | ✅ ~60 GB |
 | 65B Models | ❌ Needs 128GB+ RAM |
 
+## ❓ Frequently Asked Questions
+
+### Will official PyTorch wheels work?
+**No.** Official PyTorch wheels from pytorch.org detect the GPU but fail on compute operations with "HIP error: invalid device function". You **must** use community builds:
+```bash
+pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch
+```
+
+### How much RAM do I need for 30B models?
+**Minimum 64GB system RAM** is required. With GTT configured, the GPU can access ~60GB of system RAM plus 64GB VRAM, allowing 30B models in FP16 (~60GB needed).
+
+### Should I use ROCm or Vulkan?
+- **Use ROCm/HIP** for: PyTorch training, custom code, full ML framework support
+- **Use Vulkan** for: Inference with llama.cpp/Ollama (often 10-20% faster and simpler setup)
+
+### What's the GTT configuration and do I need it?
+GTT (Graphics Translation Table) allows the GPU to access system RAM beyond the 64GB VRAM. **You need it** to run models larger than ~30GB. See [GTT_MEMORY_FIX.md](GTT_MEMORY_FIX.md).
+
+### Can I run 65B+ models?
+**Not on a 64GB system.** 65B models in FP16 need ~130GB, which exceeds available memory. You'd need a system with 128GB+ RAM and GTT configured to 128GB.
+
+### Why is performance lower than RTX 4090?
+Strix Halo has **lower compute** (12 TFLOPS BF16 vs 165 TFLOPS) but **more memory** (113GB vs 24GB). It's optimized for memory-intensive workloads, not raw compute speed.
+
+### Do I need to set environment variables?
+**The automated setup handles this.** If setting up manually, yes - you need `HSA_OVERRIDE_GFX_VERSION=11.5.1` and `PYTORCH_ROCM_ARCH=gfx1151` at minimum.
+
+### Which ROCm version should I use?
+- **ROCm 6.4.4**: Stable, recommended for most users
+- **ROCm 7.0.2**: Latest, preview support, may have better performance
+- Both work with gfx1151
+
+### Can I quantize models to save memory?
+**Yes!** Use 4-bit or 8-bit quantization to run larger models. However, with 113GB available, you often don't need quantization for models up to 30B.
+
 ## 🐛 Common Issues
 
 ### "HIP error: invalid device function"
-**Fix**: Install community PyTorch wheels for gfx1151
+**Fix**: Install community PyTorch wheels for gfx1151 (see FAQ above)
 
 ### GPU not detected
-**Fix**: Add user to render/video groups and reboot
+**Fix**: Add user to render/video groups: `sudo usermod -aG render,video $USER` and reboot
 
 ### Out of memory below 30GB
-**Fix**: Configure GTT in GRUB (`amdttm.pages_limit=27648000`)
+**Fix**: Configure GTT in GRUB: `amdttm.pages_limit=27648000` (see [GTT_MEMORY_FIX.md](GTT_MEMORY_FIX.md))
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for more.
 
