@@ -178,10 +178,11 @@ MIT License - feel free to use, modify, and share.
 
 ## 🙏 Credits
 
-- Testing and documentation: October 2025
-- Community PyTorch builds: [@scottt](https://github.com/scottt/rocm-TheRock)
-- ROCm team and community contributors
-- Various community guides and research (see docs for links)
+- **Created by**: Ian Barber
+- **Testing and documentation**: October 2025
+- **Community PyTorch builds**: [@scottt](https://github.com/scottt/rocm-TheRock)
+- **ROCm team** and community contributors
+- Various community guides and research (see documentation for specific attributions)
 
 ---
 
