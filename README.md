@@ -126,6 +126,9 @@ Once you have the skills available:
 ## 🔍 Testing Your Setup
 
 ```bash
+# System verification (checks everything)
+./scripts/verify_system.sh
+
 # Quick GPU test
 python -c "import torch; a=torch.tensor([1.0]).cuda(); print('✓ OK:', (a+1).item())"
 

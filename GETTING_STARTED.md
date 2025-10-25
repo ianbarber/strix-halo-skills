@@ -10,8 +10,15 @@ Welcome! This guide will help you set up your AMD Strix Halo for running PyTorch
 
 ## ✅ Prerequisites Check
 
-Before starting, verify you have:
+**Quick Check (Recommended)**:
+```bash
+# Run the verification script (checks everything)
+./scripts/verify_system.sh
+```
 
+This will check ROCm, user groups, GTT, PyTorch, and GPU compute in one go.
+
+**Manual Check**:
 ```bash
 # 1. Check you have Strix Halo
 lspci | grep -i amd | grep -i vga
