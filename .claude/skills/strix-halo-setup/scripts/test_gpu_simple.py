@@ -19,5 +19,6 @@ else:
     print("✗ GPU NOT DETECTED")
     print("  This might be intermittent. Try:")
     print("  1. Close all Python sessions")
-    print("  2. Run: conda deactivate && conda activate rock311")
+    print("  2. Deactivate and reactivate your conda environment")
     print("  3. Run this script again")
+    print("  4. Check: groups | grep -E 'render|video'")
