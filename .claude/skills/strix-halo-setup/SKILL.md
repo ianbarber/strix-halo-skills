@@ -1,11 +1,27 @@
 ---
 name: strix-halo-setup
 description: Complete setup for AMD Strix Halo (Ryzen AI MAX+ 395) PyTorch environments. Handles ROCm installation verification, PyTorch community builds (official wheels don't work with gfx1151), GTT memory configuration, and environment setup. Creates ready-to-use ML workspaces for running 30B parameter models.
+license: MIT
+metadata:
+  hardware: AMD Strix Halo (gfx1151)
+  supported_rocm: "6.4.4+"
+  tested_date: "2025-10-25"
+  skill_version: "1.0.0"
 ---
 
 # Strix Halo Setup
 
 Set up a new PyTorch project optimized for AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151).
+
+## When Claude Should Use This Skill
+
+This skill should be invoked when:
+- Setting up PyTorch on AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151) hardware
+- User reports "HIP error: invalid device function" with PyTorch on AMD APU
+- Configuring environments for running LLMs on AMD integrated graphics
+- User mentions needing GTT memory configuration for ML workloads
+- Creating a new ML project specifically for Strix Halo hardware
+- User asks about running 30B parameter models on AMD Ryzen AI MAX+
 
 ## What This Skill Does
 
@@ -33,7 +49,7 @@ This checks:
 - GTT memory configuration
 - Python/Conda availability
 
-If any checks fail, see `docs/COMPLETE_GUIDE.md` for detailed fix instructions.
+If any checks fail, see `.claude/skills/strix-halo-setup/docs/STRIX_HALO_COMPLETE_GUIDE.md` for detailed fix instructions.
 
 ## Setup Process
 
@@ -54,11 +70,13 @@ Expected output:
 
 If issues found, follow the script's instructions to fix them.
 
-### Step 2: Ask User for Project Name
+### Step 2: Determine Project Name
 
-Ask the user: **"What would you like to name your project?"**
+Ask the user for a project name using the AskUserQuestion tool. If the user has already specified a name in their request, use that. Otherwise, ask:
 
-Wait for their response, then use that name throughout the setup.
+**"What would you like to name your project?"**
+
+If interaction isn't possible or the user wants a default, use `strix-ml-project`.
 
 ### Step 3: Create Conda Environment
 
@@ -323,9 +341,9 @@ groups | grep -E "render|video"  # Verify
 
 ## References
 
-- **Complete Guide**: `docs/COMPLETE_GUIDE.md`
-- **Troubleshooting**: `docs/TROUBLESHOOTING.md`
-- **GTT Configuration**: `docs/GTT_MEMORY_FIX.md`
+- **Complete Guide**: `.claude/skills/strix-halo-setup/docs/STRIX_HALO_COMPLETE_GUIDE.md`
+- **Troubleshooting**: `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md`
+- **GTT Configuration**: `.claude/skills/strix-halo-setup/docs/GTT_MEMORY_FIX.md`
 - **Community PyTorch**: https://github.com/scottt/rocm-TheRock/releases
 
 ## Notes
