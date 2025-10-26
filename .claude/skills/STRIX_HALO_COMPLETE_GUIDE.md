@@ -1,1 +1,0 @@
-../../STRIX_HALO_COMPLETE_GUIDE.md

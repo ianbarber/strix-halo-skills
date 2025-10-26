@@ -1,229 +1,225 @@
-# AMD Strix Halo Skills & Setup for Claude Code
+# Strix Halo Skills for Claude Code
 
-Complete setup guides, Claude Code skills, and utilities for running PyTorch and ML workloads on AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151).
+A **self-contained Claude Code skill** for setting up AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151) for ML workloads.
 
 ## 🚀 Quick Start
 
-### Option 1: Use as Claude Code Skills
-
-Copy the `.claude/skills/` directory to any project:
+### Use the Skill
 
 ```bash
-# In your new project directory
-git clone https://github.com/ianbarber/strix-halo-skills.git /tmp/strix-halo
-cp -r /tmp/strix-halo/.claude/skills .claude/
-```
+# Clone this repository
+git clone https://github.com/ianbarber/strix-halo-skills.git
 
-Then in Claude Code:
-```
+# Copy the skill to your project
+cp -r strix-halo-skills/.claude/skills/strix-halo-setup your-project/.claude/skills/
+
+# In Claude Code:
 @strix-halo-setup
 ```
 
-### Option 2: Automated Script
+Claude will guide you through the complete setup process.
+
+### Or Use the Scripts Directly
 
 ```bash
-git clone https://github.com/ianbarber/strix-halo-skills.git
-cd strix-halo-skills
-./setup_new_project.sh
+cd strix-halo-skills/.claude/skills/strix-halo-setup
+
+# Verify your system
+./scripts/verify_system.sh
+
+# Configure GTT memory (for 30B+ models)
+./scripts/configure_gtt.sh
 ```
 
-## 📚 What's Included
+## ⭐ What This Solves
 
-### Claude Code Skills
+### The #1 Strix Halo Problem: PyTorch Installation
 
-- **`strix-halo-setup`** - Complete project setup wizard
-- **`QUICK_REFERENCE`** - Quick reference guide
-- **`STRIX_HALO_COMPLETE_GUIDE`** - Comprehensive documentation
+**Problem**: Official PyTorch wheels from pytorch.org **DON'T WORK** with gfx1151:
+- GPU is detected: `torch.cuda.is_available() == True` ✓
+- But compute fails: `RuntimeError: HIP error: invalid device function` ✗
 
-### Scripts
+**Solution**: This skill installs community builds that actually work:
+```bash
+pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch
+```
 
-- **`setup_new_project.sh`** - Automated project setup
-- **`configure_gtt.sh`** - GTT memory configuration
-- **`scripts/test_memory.py`** - Memory capacity testing
-- **`scripts/test_gpu_simple.py`** - Quick GPU verification
-- **`scripts/amd_benchmark_safe.py`** - Performance benchmarking
-- **`scripts/test_llm_memory.py`** - LLM capacity testing
+### GTT Memory Configuration
 
-### Documentation
+**Problem**: GPU can only access ~33GB by default (limits you to 7B models)
 
-- **`STRIX_HALO_COMPLETE_GUIDE.md`** - Complete setup and usage guide
-- **`UPDATE_SUMMARY_OCT2025.md`** - October 2025 testing results
-- **`GTT_MEMORY_FIX.md`** - GTT memory configuration details
-- **`TROUBLESHOOTING.md`** - Common issues and solutions
+**Solution**: Configure GTT to access 113GB+ for running 30B parameter models
 
-## ⚡ Key Features
+## 📦 What's Included
 
-### Verified Performance (October 2025)
+### Complete Self-Contained Skill
+
+```
+.claude/skills/strix-halo-setup/
+├── SKILL.md                    # Main skill (invoke with @strix-halo-setup)
+├── README.md                   # Skill documentation
+├── scripts/
+│   ├── verify_system.sh        # Complete system verification
+│   ├── configure_gtt.sh        # GTT memory configuration
+│   ├── test_gpu_simple.py      # Quick GPU test
+│   ├── test_memory.py          # Memory capacity test
+│   ├── test_llm_memory.py      # LLM capacity simulation
+│   └── amd_benchmark_safe.py   # Performance benchmarks
+└── docs/
+    ├── COMPLETE_GUIDE.md       # Comprehensive 559-line setup guide
+    ├── GTT_MEMORY_FIX.md       # Memory configuration deep-dive
+    └── TROUBLESHOOTING.md      # Common issues and solutions
+```
+
+### Additional Documentation
+
+- **GETTING_STARTED.md** - First-time user guide
+- **USAGE_IN_OTHER_PROJECTS.md** - Integration guide
+- **CHANGELOG.md** - Version history
+- **PUBLISHING_GUIDE.md** - How to share/contribute
+
+## ✅ Verified Performance (October 2025)
+
+**Tested on real hardware:**
 - ✅ **30B parameter models** in FP16 (62.8 GB tested)
 - ✅ **12 TFLOPS BF16** compute (7 TFLOPS FP32)
 - ✅ **229 GB/s** memory bandwidth
 - ✅ **113 GB** GPU-accessible memory with GTT
 
-### Critical Information
+**Test configuration:**
+- Hardware: AMD Ryzen AI MAX+ 395 (Strix Halo, gfx1151)
+- ROCm: 6.4.2 with PyTorch 2.7.0a0 + HIP 6.5.25190
+- OS: Ubuntu 24.04 LTS, Kernel 6.14.0-33-generic
+- RAM: 64GB
 
-**PyTorch Installation**: Official PyTorch wheels **DON'T WORK** with gfx1151. You must use community builds:
+## 🎯 Usage
 
-```bash
-pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch
-```
-
-## 🛠️ System Requirements
-
-- **Hardware**: AMD Ryzen AI MAX+ 395 (Strix Halo, gfx1151)
-- **OS**: Ubuntu 24.04 LTS recommended
-- **ROCm**: 6.4.4+ or 7.0.2
-- **Kernel**: 6.14+ (6.15+ recommended)
-- **RAM**: 64GB+ for 30B models
-
-## 📖 Using in Your Project
-
-### Method 1: Copy Skills Only
+### Method 1: Copy Skill to Your Project (Recommended)
 
 ```bash
-# In your project directory
-mkdir -p .claude
-cp -r /path/to/strix-halo-skills/.claude/skills .claude/
+# Copy the complete skill
+cp -r .claude/skills/strix-halo-setup /your-project/.claude/skills/
+
+# In Claude Code:
+@strix-halo-setup
 ```
 
 ### Method 2: Git Submodule
 
 ```bash
 cd your-project
-git submodule add https://github.com/ianbarber/strix-halo-skills.git .strix-halo
-ln -s .strix-halo/.claude/skills .claude/skills
+git submodule add https://github.com/ianbarber/strix-halo-skills.git .strix
+ln -s .strix/.claude/skills/strix-halo-setup .claude/skills/
 ```
 
-### Method 3: Direct Clone and Copy
+### Method 3: Direct Script Usage
 
 ```bash
-git clone https://github.com/ianbarber/strix-halo-skills.git
-cd strix-halo-skills
-./setup_new_project.sh  # Creates new project with everything set up
+# Just run the verification script
+./claude/skills/strix-halo-setup/scripts/verify_system.sh
 ```
 
-## 🎯 Quick Setup for New Project
+## 🔍 System Verification
 
-Once you have the skills available:
-
-1. **In Claude Code**, just say:
-   ```
-   @strix-halo-setup
-   ```
-
-2. **Or use the script**:
-   ```bash
-   ./setup_new_project.sh
-   ```
-
-3. **Or manually**:
-   ```bash
-   conda create -n myproject python=3.12
-   conda activate myproject
-   pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch
-   # Set up env vars from .claude/skills/strix-halo-setup.md
-   ```
-
-## 🔍 Testing Your Setup
+Check if your system is ready:
 
 ```bash
-# System verification (checks everything)
-./scripts/verify_system.sh
-
-# Quick GPU test
-python -c "import torch; a=torch.tensor([1.0]).cuda(); print('✓ OK:', (a+1).item())"
-
-# Full test suite
-python scripts/test_gpu_simple.py
-python scripts/test_memory.py
-python scripts/amd_benchmark_safe.py --device cuda
+./claude/skills/strix-halo-setup/scripts/verify_system.sh
 ```
+
+This checks:
+- AMD GPU detection
+- ROCm installation (6.4.4+ or 7.0.2)
+- User groups (render/video)
+- GTT configuration
+- Python/Conda
+- PyTorch installation
+- GPU compute functionality
+
+**Color-coded output:**
+- ✓ **Green**: Working correctly
+- ✗ **Red**: Critical issue (needs fixing)
+- ⚠ **Yellow**: Warning (works but not optimal)
 
 ## 📊 Expected Performance
 
-| Metric | Value |
-|--------|-------|
-| FP32 Compute | ~7 TFLOPS |
-| BF16 Compute | ~12 TFLOPS |
-| Memory Bandwidth | 229 GB/s write, 201 GB/s copy |
-| Max Memory | 113 GB GPU-accessible |
-| 7B Models | ✅ ~14 GB |
-| 13B Models | ✅ ~26 GB |
-| 30B Models | ✅ ~60 GB |
-| 65B Models | ❌ Needs 128GB+ RAM |
+| Metric | Value | Comparison |
+|--------|-------|------------|
+| FP32 Compute | ~7 TFLOPS | RTX 4090: 82 TFLOPS |
+| BF16 Compute | ~12 TFLOPS | RTX 4090: 165 TFLOPS |
+| Memory | 113 GB | RTX 4090: 24 GB |
+| Bandwidth | 229 GB/s | RTX 4090: 1000 GB/s |
+| **7B Models** | ✅ ~14 GB | ✅ Both work |
+| **13B Models** | ✅ ~26 GB | ✅ Both work |
+| **30B Models** | ✅ ~60 GB | ❌ Won't fit on 4090 |
+| **65B Models** | ❌ Needs 128GB+ RAM | ❌ Won't fit |
 
-## ❓ Frequently Asked Questions
+**Advantage**: Memory capacity - run 30B models that won't fit on consumer GPUs
+
+**Trade-off**: Lower compute speed, but enough for inference and experimentation
+
+## ❓ FAQ
 
 ### Will official PyTorch wheels work?
-**No.** Official PyTorch wheels from pytorch.org detect the GPU but fail on compute operations with "HIP error: invalid device function". You **must** use community builds:
+**No.** They detect GPU but fail on compute. You must use community builds (this skill handles it).
+
+### How much RAM do I need?
+- **7B models**: Works with default ~33GB
+- **13B models**: Works with default ~33GB
+- **30B models**: Requires 64GB+ RAM and GTT configuration
+- **65B models**: Requires 128GB+ RAM
+
+### Should I use ROCm or Vulkan?
+- **ROCm/HIP**: For PyTorch, training, custom code
+- **Vulkan**: For inference (llama.cpp, Ollama) - often 10-20% faster
+
+### What if I get "HIP error: invalid device function"?
+You're using official PyTorch wheels. Reinstall with:
 ```bash
 pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch
 ```
 
-### How much RAM do I need for 30B models?
-**Minimum 64GB system RAM** is required. With GTT configured, the GPU can access ~60GB of system RAM plus 64GB VRAM, allowing 30B models in FP16 (~60GB needed).
+## 🛠️ Prerequisites
 
-### Should I use ROCm or Vulkan?
-- **Use ROCm/HIP** for: PyTorch training, custom code, full ML framework support
-- **Use Vulkan** for: Inference with llama.cpp/Ollama (often 10-20% faster and simpler setup)
+- **Hardware**: AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151)
+- **OS**: Ubuntu 24.04 LTS recommended (Linux kernel 6.14+)
+- **ROCm**: 6.4.4+ or 7.0.2
+- **RAM**: 64GB+ for 30B models
+- **User groups**: Must be in `render` and `video` groups
 
-### What's the GTT configuration and do I need it?
-GTT (Graphics Translation Table) allows the GPU to access system RAM beyond the 64GB VRAM. **You need it** to run models larger than ~30GB. See [GTT_MEMORY_FIX.md](GTT_MEMORY_FIX.md).
+## 📚 Documentation
 
-### Can I run 65B+ models?
-**Not on a 64GB system.** 65B models in FP16 need ~130GB, which exceeds available memory. You'd need a system with 128GB+ RAM and GTT configured to 128GB.
-
-### Why is performance lower than RTX 4090?
-Strix Halo has **lower compute** (12 TFLOPS BF16 vs 165 TFLOPS) but **more memory** (113GB vs 24GB). It's optimized for memory-intensive workloads, not raw compute speed.
-
-### Do I need to set environment variables?
-**The automated setup handles this.** If setting up manually, yes - you need `HSA_OVERRIDE_GFX_VERSION=11.5.1` and `PYTORCH_ROCM_ARCH=gfx1151` at minimum.
-
-### Which ROCm version should I use?
-- **ROCm 6.4.4**: Stable, recommended for most users
-- **ROCm 7.0.2**: Latest, preview support, may have better performance
-- Both work with gfx1151
-
-### Can I quantize models to save memory?
-**Yes!** Use 4-bit or 8-bit quantization to run larger models. However, with 113GB available, you often don't need quantization for models up to 30B.
-
-## 🐛 Common Issues
-
-### "HIP error: invalid device function"
-**Fix**: Install community PyTorch wheels for gfx1151 (see FAQ above)
-
-### GPU not detected
-**Fix**: Add user to render/video groups: `sudo usermod -aG render,video $USER` and reboot
-
-### Out of memory below 30GB
-**Fix**: Configure GTT in GRUB: `amdttm.pages_limit=27648000` (see [GTT_MEMORY_FIX.md](GTT_MEMORY_FIX.md))
-
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for more.
+- **`.claude/skills/strix-halo-setup/SKILL.md`** - Main skill with setup steps
+- **`.claude/skills/strix-halo-setup/docs/COMPLETE_GUIDE.md`** - 559-line comprehensive guide
+- **`GETTING_STARTED.md`** - First-time user walkthrough
+- **`CHANGELOG.md`** - Version history and updates
 
 ## 🌐 Community Resources
 
 - **PyTorch Wheels**: https://github.com/scottt/rocm-TheRock/releases
 - **ROCm Community**: https://github.com/ROCm/TheRock/discussions/655
 - **Strix Halo Info**: https://llm-tracker.info/_TOORG/Strix-Halo
-- **GTT Configuration**: https://www.jeffgeerling.com/blog/2025/increasing-vram-allocation-on-amd-ai-apus-under-linux
+- **GTT Guide**: https://www.jeffgeerling.com/blog/2025/increasing-vram-allocation-on-amd-ai-apus-under-linux
 
 ## 📝 Contributing
 
-Issues, suggestions, and improvements welcome! This is community-maintained documentation based on real-world testing.
+Issues and improvements welcome! This is actively maintained based on real-world testing.
+
+See **PUBLISHING_GUIDE.md** for contribution guidelines.
 
 ## 📜 License
 
-MIT License - feel free to use, modify, and share.
+MIT License - Copyright (c) 2025 Ian Barber
 
 ## 🙏 Credits
 
 - **Created by**: Ian Barber
-- **Testing and documentation**: October 2025
 - **Community PyTorch builds**: [@scottt](https://github.com/scottt/rocm-TheRock)
 - **ROCm team** and community contributors
-- Various community guides and research (see documentation for specific attributions)
+- Testing based on community research from llm-tracker.info, Jeff Geerling, and ROCm/TheRock
 
 ---
 
 **Hardware Tested**: AMD Ryzen AI MAX+ 395 (Strix Halo, gfx1151)
-**Software Stack**: ROCm 6.4.2, PyTorch 2.7.0a0, Linux 6.14, Ubuntu 24.04
-**Last Updated**: October 23, 2025
+**Last Updated**: October 25, 2025
+**Version**: 1.0.0

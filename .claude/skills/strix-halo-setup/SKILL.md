@@ -1,0 +1,336 @@
+---
+name: strix-halo-setup
+description: Complete setup for AMD Strix Halo (Ryzen AI MAX+ 395) PyTorch environments. Handles ROCm installation verification, PyTorch community builds (official wheels don't work with gfx1151), GTT memory configuration, and environment setup. Creates ready-to-use ML workspaces for running 30B parameter models.
+---
+
+# Strix Halo Setup
+
+Set up a new PyTorch project optimized for AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151).
+
+## What This Skill Does
+
+1. Verifies system configuration (ROCm, GTT, user groups)
+2. Creates a conda environment with working PyTorch for gfx1151
+3. Sets up proper environment variables
+4. Creates test scripts to verify GPU functionality
+5. Provides a complete project template with best practices
+
+## Critical Information
+
+**PyTorch Installation**: Official PyTorch wheels from pytorch.org **DO NOT WORK** with gfx1151. They detect the GPU but fail on compute with "HIP error: invalid device function". This skill installs community builds that actually work.
+
+## Prerequisites Check
+
+Before running setup, verify the system with:
+
+```bash
+./scripts/verify_system.sh
+```
+
+This checks:
+- ROCm installation (6.4.4+ or 7.0.2 required)
+- User in `render` and `video` groups
+- GTT memory configuration
+- Python/Conda availability
+
+If any checks fail, see `docs/COMPLETE_GUIDE.md` for detailed fix instructions.
+
+## Setup Process
+
+### Step 1: System Verification
+
+Run the verification script:
+
+```bash
+cd .claude/skills/strix-halo-setup
+./scripts/verify_system.sh
+```
+
+Expected output:
+- ✓ AMD GPU detected
+- ✓ ROCm installed
+- ✓ User in render/video groups
+- ✓ GTT configured (or warning if not)
+
+If issues found, follow the script's instructions to fix them.
+
+### Step 2: Ask User for Project Name
+
+Ask the user: **"What would you like to name your project?"**
+
+Wait for their response, then use that name throughout the setup.
+
+### Step 3: Create Conda Environment
+
+```bash
+# Create new environment with Python 3.12
+conda create -n {project_name} python=3.12 -y
+conda activate {project_name}
+```
+
+### Step 4: Install PyTorch (Community Build)
+
+**CRITICAL**: Must use community builds, not official wheels.
+
+**Option 1: AMD Nightlies (Recommended)**
+```bash
+pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch torchvision torchaudio
+```
+
+**Option 2: scottt's Stable Builds (Fallback)**
+If nightlies fail, use pre-built wheels from:
+https://github.com/scottt/rocm-TheRock/releases
+
+Download and install with `pip install <wheel_file>`.
+
+**Verify Installation**:
+```bash
+python -c "import torch; print('PyTorch:', torch.__version__); print('HIP:', torch.version.hip)"
+```
+
+Should show PyTorch 2.7+ and HIP 6.5+.
+
+### Step 5: Install ML Libraries
+
+```bash
+pip install numpy transformers accelerate datasets
+pip install jupyter ipykernel  # Optional: for notebooks
+```
+
+### Step 6: Configure Environment Variables
+
+Create activation script in the conda environment:
+
+```bash
+mkdir -p $CONDA_PREFIX/etc/conda/activate.d
+
+cat > $CONDA_PREFIX/etc/conda/activate.d/strix_halo_env.sh << 'EOF'
+#!/bin/bash
+
+# Core ROCm settings for Strix Halo (gfx1151)
+export HSA_OVERRIDE_GFX_VERSION=11.5.1
+export PYTORCH_ROCM_ARCH=gfx1151
+
+# Unified Memory Configuration - CRITICAL for accessing full memory
+export HSA_XNACK=1
+export HSA_FORCE_FINE_GRAIN_PCIE=1
+
+# Memory allocation settings
+export GPU_MAX_HEAP_SIZE=100
+export GPU_MAX_ALLOC_PERCENT=100
+
+# Device visibility
+export ROCR_VISIBLE_DEVICES=0
+export HIP_VISIBLE_DEVICES=0
+
+# Performance optimizations
+export ROCBLAS_USE_HIPBLASLT=1
+export AMD_LOG_LEVEL=0
+export HSA_CU_MASK=0xffffffffffffffff
+
+echo "✓ Strix Halo environment variables set"
+EOF
+
+chmod +x $CONDA_PREFIX/etc/conda/activate.d/strix_halo_env.sh
+```
+
+Create deactivation script:
+
+```bash
+mkdir -p $CONDA_PREFIX/etc/conda/deactivate.d
+
+cat > $CONDA_PREFIX/etc/conda/deactivate.d/strix_halo_env.sh << 'EOF'
+#!/bin/bash
+
+unset HSA_OVERRIDE_GFX_VERSION PYTORCH_ROCM_ARCH HSA_XNACK HSA_FORCE_FINE_GRAIN_PCIE
+unset GPU_MAX_HEAP_SIZE GPU_MAX_ALLOC_PERCENT ROCR_VISIBLE_DEVICES HIP_VISIBLE_DEVICES
+unset ROCBLAS_USE_HIPBLASLT AMD_LOG_LEVEL HSA_CU_MASK
+EOF
+
+chmod +x $CONDA_PREFIX/etc/conda/deactivate.d/strix_halo_env.sh
+```
+
+### Step 7: Create Project Structure
+
+```bash
+mkdir -p {project_name}/{scripts,notebooks,data,models,tests}
+cd {project_name}
+```
+
+### Step 8: Copy Test Scripts
+
+Copy the test scripts from the skill directory:
+
+```bash
+cp .claude/skills/strix-halo-setup/scripts/*.py scripts/
+chmod +x scripts/*.py
+```
+
+### Step 9: Create Project README
+
+Create a README with project-specific information:
+
+```bash
+cat > README.md << 'EOF'
+# {Project Name}
+
+PyTorch project optimized for AMD Strix Halo (gfx1151).
+
+## Environment
+
+- **Hardware**: AMD Strix Halo (gfx1151)
+- **ROCm**: 6.4.2+
+- **PyTorch**: Community build for gfx1151
+- **Python**: 3.12
+
+## Setup
+
+```bash
+# Activate environment
+conda activate {project_name}
+
+# Verify GPU
+python scripts/test_gpu_simple.py
+
+# Test memory capacity
+python scripts/test_memory.py
+```
+
+## Hardware Capabilities
+
+- **Compute**: ~7 TFLOPS FP32, ~12 TFLOPS BF16
+- **Memory**: Up to 113GB GPU-accessible (with GTT configuration)
+- **Model Capacity**: 30B parameter models in FP16
+
+## Best Practices
+
+1. **Use BF16** for 1.6x speedup over FP32
+2. **Keep batch size small** (1-4) for inference
+3. **Data in VRAM is faster** than GTT memory
+4. **Monitor memory**: `rocm-smi --showmeminfo gtt`
+
+## Troubleshooting
+
+If compute fails with "HIP error: invalid device function":
+- You're using official PyTorch wheels (don't work with gfx1151)
+- Reinstall: `pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch`
+
+For more help, see `.claude/skills/strix-halo-setup/docs/COMPLETE_GUIDE.md`
+
+Created: {date}
+EOF
+```
+
+### Step 10: Verify Installation
+
+Reactivate the environment to load variables:
+
+```bash
+conda deactivate
+conda activate {project_name}
+
+# Should see: "✓ Strix Halo environment variables set"
+```
+
+Run verification:
+
+```bash
+python scripts/test_gpu_simple.py
+```
+
+**Expected output:**
+```
+============================================================
+STRIX HALO GPU TEST
+============================================================
+✓ GPU detected: AMD Radeon Graphics
+  Memory: 113.2 GB
+  Compute test successful
+✓ ALL TESTS PASSED
+============================================================
+```
+
+### Step 11: Final Summary
+
+Tell the user:
+
+```
+✓ Setup complete! Your Strix Halo environment is ready.
+
+Project: {project_name}
+Location: {full_path}
+
+Next steps:
+  1. Test GPU: python scripts/test_gpu_simple.py
+  2. Test memory: python scripts/test_memory.py
+  3. Try a model: See docs/COMPLETE_GUIDE.md for examples
+
+Hardware capabilities:
+  - 7-12 TFLOPS compute (FP32/BF16)
+  - 113 GB GPU-accessible memory
+  - Can run 30B parameter models in FP16
+
+Activate anytime with: conda activate {project_name}
+```
+
+## Success Criteria
+
+All of these should pass:
+- ✓ PyTorch detects GPU
+- ✓ Compute operations succeed (no HIP errors)
+- ✓ Can allocate 30GB+ memory
+- ✓ BF16 operations work
+- ✓ Achieves ~7 TFLOPS FP32, ~12 TFLOPS BF16
+
+## Common Issues
+
+### Issue: "HIP error: invalid device function"
+
+**Cause**: Using official PyTorch wheels (don't work with gfx1151)
+
+**Solution**:
+```bash
+pip uninstall torch torchvision torchaudio
+pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch torchvision torchaudio
+```
+
+**Verify it worked**:
+```bash
+python -c "import torch; a=torch.tensor([1.0]).cuda(); print('✓ Works:', (a+1).item())"
+```
+
+### Issue: Out of memory below 30GB
+
+**Cause**: GTT not configured (limited to ~33GB)
+
+**Solution**: Configure GTT memory:
+```bash
+.claude/skills/strix-halo-setup/scripts/configure_gtt.sh
+```
+
+This adds kernel parameters to GRUB for GPU to access more system RAM.
+
+### Issue: GPU not detected
+
+**Cause**: User not in render/video groups
+
+**Solution**:
+```bash
+sudo usermod -aG render,video $USER
+# Log out and back in (or reboot)
+groups | grep -E "render|video"  # Verify
+```
+
+## References
+
+- **Complete Guide**: `docs/COMPLETE_GUIDE.md`
+- **Troubleshooting**: `docs/TROUBLESHOOTING.md`
+- **GTT Configuration**: `docs/GTT_MEMORY_FIX.md`
+- **Community PyTorch**: https://github.com/scottt/rocm-TheRock/releases
+
+## Notes
+
+- This skill creates production-ready environments based on October 2025 testing
+- GTT configuration is optional but required for 30B+ models
+- Vulkan backend often performs better for inference (see complete guide)
+- Consider using BF16 by default for 1.6x speedup
