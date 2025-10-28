@@ -2,7 +2,7 @@
 # Strix Halo System Verification Script
 # Checks all prerequisites and system configuration
 
-set -e
+# Not using 'set -e' to allow all checks to run even if some fail
 
 # Colors for output
 RED='\033[0;31m'
@@ -104,9 +104,10 @@ else
     echo "      For 30B+ models, configure GTT: ./configure_gtt.sh"
 fi
 
-# Check actual GTT size
-if [ -f "/sys/class/drm/card1/device/mem_info_gtt_total" ]; then
-    GTT_BYTES=$(cat /sys/class/drm/card1/device/mem_info_gtt_total)
+# Check actual GTT size (find correct card dynamically)
+GTT_FILE=$(find /sys/class/drm/card*/device/mem_info_gtt_total 2>/dev/null | head -1)
+if [ -n "$GTT_FILE" ]; then
+    GTT_BYTES=$(cat "$GTT_FILE")
     GTT_ACTUAL_GB=$((GTT_BYTES / 1024 / 1024 / 1024))
     if [ $GTT_ACTUAL_GB -gt 100 ]; then
         print_result "PASS" "GTT memory available: ${GTT_ACTUAL_GB}GB"

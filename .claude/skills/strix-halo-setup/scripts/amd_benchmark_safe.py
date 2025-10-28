@@ -67,27 +67,30 @@ def safe_benchmark_matmul(device, sizes=[1024, 2048], iterations=20):
                     torch.cuda.synchronize()
                 
                 # Warmup with fewer iterations
-                for _ in range(3):
-                    c = torch.matmul(a, b)
-                    del c  # Immediately free memory
-                
+                with torch.no_grad():
+                    for _ in range(3):
+                        c = torch.matmul(a, b)
+                        del c  # Immediately free memory
+
                 if device.type == 'cuda':
                     torch.cuda.synchronize()
-                
+
                 # Time the operations
                 start_time = time.time()
-                for _ in range(iterations):
-                    c = torch.matmul(a, b)
-                    del c  # Immediately free memory
-                
+                with torch.no_grad():
+                    for _ in range(iterations):
+                        c = torch.matmul(a, b)
+                        del c  # Immediately free memory
+
                 if device.type == 'cuda':
                     torch.cuda.synchronize()
-                
+
                 elapsed = time.time() - start_time
-                
+
                 # Calculate TFLOPS
-                ops_multiplier = 1.0 if dtype == torch.float32 else 2.0
-                tflops = (2 * size**3 * iterations * ops_multiplier) / (elapsed * 1e12)
+                # Note: FLOPS count is same regardless of dtype (FP32/BF16)
+                # Performance differences naturally show in elapsed time
+                tflops = (2 * size**3 * iterations) / (elapsed * 1e12)
                 
                 results[f"{precision_name}_{size}"] = {
                     "tflops": tflops,

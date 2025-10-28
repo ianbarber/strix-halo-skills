@@ -2,6 +2,8 @@
 
 A **self-contained Claude Code skill** for setting up AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151) for ML workloads.
 
+> **⚠️ Disclaimer**: This skill was developed with Claude Code and tested only on Ubuntu 24.04 LTS. While the scripts follow best practices, they may need adjustments for other distributions or configurations. Community testing and feedback welcome!
+
 ## 🚀 Quick Start
 
 ### Use the Skill
@@ -141,22 +143,18 @@ This checks:
 - ✗ **Red**: Critical issue (needs fixing)
 - ⚠ **Yellow**: Warning (works but not optimal)
 
-## 📊 Expected Performance
+## 📊 What You Can Run
 
-| Metric | Value | Comparison |
-|--------|-------|------------|
-| FP32 Compute | ~7 TFLOPS | RTX 4090: 82 TFLOPS |
-| BF16 Compute | ~12 TFLOPS | RTX 4090: 165 TFLOPS |
-| Memory | 113 GB | RTX 4090: 24 GB |
-| Bandwidth | 229 GB/s | RTX 4090: 1000 GB/s |
-| **7B Models** | ✅ ~14 GB | ✅ Both work |
-| **13B Models** | ✅ ~26 GB | ✅ Both work |
-| **30B Models** | ✅ ~60 GB | ❌ Won't fit on 4090 |
-| **65B Models** | ❌ Needs 128GB+ RAM | ❌ Won't fit |
+| Model Size | Memory Needed | Status on Strix Halo | Status on RTX 4090 |
+|------------|---------------|---------------------|-------------------|
+| **7B FP16** | ~14 GB | ✅ Works | ✅ Works |
+| **13B FP16** | ~26 GB | ✅ Works | ✅ Works |
+| **30B FP16** | ~60 GB | ✅ Works (with GTT) | ❌ Won't fit (24GB) |
+| **65B FP16** | ~130 GB | ❌ Needs 128GB+ RAM | ❌ Won't fit |
 
-**Advantage**: Memory capacity - run 30B models that won't fit on consumer GPUs
+**Key Advantage**: Memory capacity! With GTT configured, you have 113GB GPU-accessible memory. This lets you run 30B parameter models that won't fit on most consumer GPUs.
 
-**Trade-off**: Lower compute speed, but enough for inference and experimentation
+**Note**: Compute performance is lower than discrete GPUs, but sufficient for inference and experimentation.
 
 ## ❓ FAQ
 

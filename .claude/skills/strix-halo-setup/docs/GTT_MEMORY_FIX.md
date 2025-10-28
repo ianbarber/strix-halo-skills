@@ -153,18 +153,6 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 ```
 
-## Future Outlook
-
-### Expected Timeline
-- **Q1 2025**: Current state - 33.5GB GTT limitation
-- **Q2 2025**: Expected ROCm 6.5 with better APU support
-- **H2 2025**: Full unified memory support anticipated
-
-### AMD Development
-- Active development on ROCm APU support
-- Kernel driver improvements in each release
-- Community patches being upstreamed
-
 ## Recommendations
 
 ### For Maximum Memory Access Now:

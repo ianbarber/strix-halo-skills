@@ -70,20 +70,35 @@ Expected output:
 
 If issues found, follow the script's instructions to fix them.
 
-### Step 2: Determine Project Name
+### Step 2: Determine Project Name and Backend
 
-Ask the user for a project name using the AskUserQuestion tool. If the user has already specified a name in their request, use that. Otherwise, ask:
+Ask the user for:
+1. **Project name**: If not specified, use `strix-ml-project`
+2. **Backend choice**: PyTorch (training/custom code) or Vulkan (inference only)
 
-**"What would you like to name your project?"**
+Use the AskUserQuestion tool:
 
-If interaction isn't possible or the user wants a default, use `strix-ml-project`.
+**Question 1**: "What would you like to name your project?"
+**Question 2**: "Which backend do you want to set up?"
+- **PyTorch with ROCm**: For training, custom code, full ML framework (supports transformers, etc.)
+- **Vulkan**: For inference only (llama.cpp, Ollama) - simpler setup, often faster
 
-### Step 3: Create Conda Environment
+If PyTorch is chosen, continue with steps below. If Vulkan, skip to Vulkan setup section at the end.
 
+### Step 3: Create Environment
+
+**Using Conda (Recommended)**:
 ```bash
-# Create new environment with Python 3.12
-conda create -n {project_name} python=3.12 -y
+# Create new environment with Python 3.14 (or 3.13)
+conda create -n {project_name} python=3.14 -y
 conda activate {project_name}
+```
+
+**Using uv (Alternative)**:
+```bash
+# Create new environment with Python 3.14 (or 3.13)
+uv venv {project_name} --python 3.14
+source {project_name}/bin/activate
 ```
 
 ### Step 4: Install PyTorch (Community Build)
@@ -108,14 +123,7 @@ python -c "import torch; print('PyTorch:', torch.__version__); print('HIP:', tor
 
 Should show PyTorch 2.7+ and HIP 6.5+.
 
-### Step 5: Install ML Libraries
-
-```bash
-pip install numpy transformers accelerate datasets
-pip install jupyter ipykernel  # Optional: for notebooks
-```
-
-### Step 6: Configure Environment Variables
+### Step 5: Configure Environment Variables
 
 Create activation script in the conda environment:
 
@@ -298,7 +306,6 @@ All of these should pass:
 - ✓ Compute operations succeed (no HIP errors)
 - ✓ Can allocate 30GB+ memory
 - ✓ BF16 operations work
-- ✓ Achieves ~7 TFLOPS FP32, ~12 TFLOPS BF16
 
 ## Common Issues
 
@@ -346,9 +353,72 @@ groups | grep -E "render|video"  # Verify
 - **GTT Configuration**: `.claude/skills/strix-halo-setup/docs/GTT_MEMORY_FIX.md`
 - **Community PyTorch**: https://github.com/scottt/rocm-TheRock/releases
 
+---
+
+## Vulkan Setup (Alternative to PyTorch)
+
+If the user chose Vulkan for inference-only workloads:
+
+### Step V1: Install Vulkan Drivers
+
+```bash
+sudo apt install mesa-vulkan-drivers vulkan-tools
+```
+
+### Step V2: Verify Vulkan
+
+```bash
+vulkaninfo | grep "deviceName"
+# Should show: AMD Radeon Graphics or similar
+```
+
+### Step V3: Install Inference Tools
+
+**For llama.cpp**:
+```bash
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp
+make LLAMA_VULKAN=1
+```
+
+**For Ollama**:
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+### Step V4: Test Vulkan
+
+```bash
+# With llama.cpp
+./llama-cli -m /path/to/model.gguf -ngl 99 --gpu-backend vulkan
+
+# With Ollama
+ollama run llama2
+```
+
+### Vulkan Summary
+
+Tell the user:
+```
+✓ Vulkan setup complete!
+
+Backend: Vulkan (inference only)
+Use with: llama.cpp, Ollama, other Vulkan-enabled tools
+
+Note: Vulkan often provides better performance for inference than ROCm/HIP.
+For training or custom PyTorch code, set up PyTorch instead.
+```
+
+---
+
+## References
+
+- **Troubleshooting**: `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md`
+- **GTT Configuration**: `.claude/skills/strix-halo-setup/docs/GTT_MEMORY_FIX.md`
+- **Community PyTorch**: https://github.com/scottt/rocm-TheRock/releases
+
 ## Notes
 
-- This skill creates production-ready environments based on October 2025 testing
 - GTT configuration is optional but required for 30B+ models
-- Vulkan backend often performs better for inference (see complete guide)
-- Consider using BF16 by default for 1.6x speedup
+- Vulkan backend often provides better performance for inference
+- Use BF16 precision in PyTorch for better performance
