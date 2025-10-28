@@ -1,83 +1,110 @@
-# Troubleshooting PyTorch GPU Detection on AMD Strix Halo
+# Troubleshooting AMD Strix Halo Setup
 
-## Problem: PyTorch shows "CUDA available: False" intermittently
+## Common Issues
 
-### Quick Test
+### Quick Diagnosis
+
 ```bash
-python test_gpu_simple.py
+# Run the verification script
+./claude/skills/strix-halo-setup/scripts/verify_system.sh
 ```
 
-### Common Causes and Solutions
+This checks all prerequisites and identifies specific issues.
 
-#### 1. Environment Variables Not Set (Most Common)
-**Symptom**: GPU not detected in new terminals
+## Problem 1: GPU Not Detected
 
-**Solution**: Add to your shell configuration permanently
+**Symptom**: `torch.cuda.is_available()` returns `False`
+
+### Most Common Cause: User Groups
+
+**Check:**
 ```bash
-# Add these to ~/.bashrc or ~/.zshrc
+groups | grep -E "render|video"
+```
+
+**Fix:**
+```bash
+sudo usermod -aG render,video $USER
+# Log out and back in (or reboot)
+```
+
+### Check ROCm Installation
+
+```bash
+rocm-smi
+# Should show: GPU[0] gfx1151
+```
+
+If not, install ROCm 6.4.4+ or 7.0.2 (see skill documentation).
+
+### Check PyTorch Has ROCm Support
+
+```bash
+python -c "import torch; print(hasattr(torch.version, 'hip'))"
+# Should print: True
+```
+
+If False, you have CPU-only PyTorch. Install ROCm version.
+
+## Problem 2: GPU Detected But Compute Fails
+
+**Symptom**: `torch.cuda.is_available()` is `True` but operations fail with:
+```
+RuntimeError: HIP error: invalid device function
+```
+
+**Cause**: Using official PyTorch wheels (don't work with gfx1151)
+
+**Fix**: Install community builds:
+```bash
+pip uninstall torch torchvision torchaudio
+pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch
+```
+
+**Verify:**
+```bash
+python -c "import torch; a=torch.tensor([1.0]).cuda(); print((a+1).item())"
+# Should print: 2.0
+```
+
+## Problem 3: Out of Memory with Models < 30GB
+
+**Symptom**: OOM errors with models that should fit
+
+**Cause**: GTT not configured (limited to ~33GB)
+
+**Fix:**
+```bash
+# Run the GTT configuration script
+./claude/skills/strix-halo-setup/scripts/configure_gtt.sh
+```
+
+Or manually add to GRUB (kernels before 6.16.9):
+```bash
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash amdttm.pages_limit=27648000 amdttm.page_pool_size=27648000"
+```
+
+**Note**: Kernel 6.16.9+ doesn't need GTT parameters.
+
+## Problem 4: Environment Variables
+
+**Symptom**: GPU works sometimes, not others
+
+**Cause**: Environment variables not set consistently
+
+**Fix**: Use conda activation scripts (the skill does this automatically):
+
+```bash
+mkdir -p $CONDA_PREFIX/etc/conda/activate.d
+cat > $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh << 'EOF'
 export HSA_OVERRIDE_GFX_VERSION=11.5.1
 export PYTORCH_ROCM_ARCH=gfx1151
 export HSA_XNACK=1
-
-# Then reload
-source ~/.bashrc
+EOF
+chmod +x $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 ```
 
-#### 2. Conda Environment Issue
-**Symptom**: Works outside conda, fails inside
-
-**Solution**: Reset the conda environment
-```bash
-# Deactivate and reactivate
-conda deactivate
-conda activate rock311
-
-# Or create activation scripts
-mkdir -p $CONDA_PREFIX/etc/conda/activate.d
-echo 'export HSA_OVERRIDE_GFX_VERSION=11.5.1' > $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-echo 'export PYTORCH_ROCM_ARCH=gfx1151' >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-echo 'export HSA_XNACK=1' >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-```
-
-#### 3. Python Session Already Started
-**Symptom**: Setting environment variables doesn't help
-
-**Solution**: Environment variables must be set BEFORE Python starts
-```bash
-# Wrong way:
-python
->>> import os
->>> os.environ['HSA_OVERRIDE_GFX_VERSION'] = '11.5.1'  # Too late!
->>> import torch  # Won't work
-
-# Right way:
-export HSA_OVERRIDE_GFX_VERSION=11.5.1
-python
->>> import torch  # Works!
-```
-
-#### 4. ROCm Runtime Issue
-**Symptom**: Intermittent detection
-
-**Solution**: Check ROCm is properly loaded
-```bash
-# Check GPU is visible to ROCm
-rocm-smi
-
-# Check HIP runtime
-hipconfig --version
-
-# Reset GPU (if needed)
-sudo rocm-smi --gpureset
-```
-
-#### 5. Library Path Issue
-**Symptom**: ROCm libraries not found
-
-**Solution**: Add ROCm to library path
-```bash
-export LD_LIBRARY_PATH=/opt/rocm/lib:$LD_LIBRARY_PATH
-```
+**Important**: Environment variables must be set BEFORE importing PyTorch. Setting them in Python won't work.
 
 ### Diagnostic Commands
 
@@ -98,69 +125,32 @@ rocminfo | grep gfx1151
 python -c "import torch; print(torch.cuda.is_available())"
 ```
 
-### Nuclear Option - Full Reset
-
-If nothing works, try a complete reset:
+## Diagnostic Commands
 
 ```bash
-# 1. Close all Python/Jupyter sessions
-pkill -f python
+# Check GPU visibility
+lspci | grep -i amd
+rocm-smi
+rocminfo | grep gfx1151
 
-# 2. Unload and reload amdgpu module (requires sudo)
-sudo modprobe -r amdgpu
-sudo modprobe amdgpu
+# Check PyTorch installation
+python -c "import torch; print('PyTorch:', torch.__version__); print('HIP:', torch.version.hip if hasattr(torch.version, 'hip') else 'None')"
 
-# 3. Set all environment variables
-export HSA_OVERRIDE_GFX_VERSION=11.5.1
-export PYTORCH_ROCM_ARCH=gfx1151
-export HSA_XNACK=1
-export ROCR_VISIBLE_DEVICES=0
-export HIP_VISIBLE_DEVICES=0
-export GPU_MAX_HEAP_SIZE=100
-export GPU_MAX_ALLOC_PERCENT=100
+# Test GPU detection
+python -c "import torch; print('GPU detected:', torch.cuda.is_available())"
 
-# 4. Test
-python -c "import torch; print(f'GPU: {torch.cuda.is_available()}')"
+# Test compute
+python -c "import torch; a=torch.tensor([1.0]).cuda(); print('Compute works:', (a+1).item())"
+
+# Check environment variables
+env | grep -E "HSA_|PYTORCH_|ROCM_"
 ```
 
-### Working Configuration Reference
+## When Everything Works
 
-When everything is working, you should see:
-```
-Environment Variables:
-  HSA_OVERRIDE_GFX_VERSION: 11.5.1
-  PYTORCH_ROCM_ARCH: gfx1151
-  HSA_XNACK: 1
+You should see:
+- `torch.cuda.is_available()` returns `True`
+- Compute operations complete without HIP errors
+- Can allocate 30GB+ tensors (with GTT configured)
 
-PyTorch Information:
-  PyTorch version: 2.7.0a0+gitbfd8155
-  HIP/ROCm version: 6.5.25190-39c57805b
-  CUDA available: True
-  Device name: AMD Radeon Graphics
-```
-
-### If Still Not Working
-
-1. **Verify PyTorch has ROCm support**:
-```bash
-python -c "import torch; print(hasattr(torch.version, 'hip'))"
-# Should print: True
-```
-
-2. **Check PyTorch can see ROCm libraries**:
-```bash
-ldd $(python -c "import torch; print(torch.__file__.replace('__init__.py', 'lib/libtorch_hip.so'))") | grep -i hip
-# Should show HIP libraries
-```
-
-3. **Try the wrapper script**:
-```bash
-./run_with_rocm.sh test_gpu_simple.py
-```
-
-### Notes
-
-- The GPU detection can be flaky on Strix Halo due to early driver support
-- Sometimes it works without environment variables, sometimes it requires them
-- The environment variables don't hurt even when not needed
-- Always set them BEFORE importing PyTorch
+If using the skill-created environment, variables are auto-configured via conda activation scripts.
