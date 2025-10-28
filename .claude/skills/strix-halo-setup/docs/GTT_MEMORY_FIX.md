@@ -1,7 +1,10 @@
-# AMD Strix Halo GTT Memory Limitation - Research & Solutions
+# AMD Strix Halo GTT Memory Configuration
 
 ## Executive Summary
-The AMD Strix Halo (Ryzen AI MAX+) currently limits GPU-accessible memory to ~33.5GB despite having 128GB total system memory. This is a software/driver limitation in the Graphics Translation Table (GTT) configuration, not a hardware limitation.
+
+The AMD Strix Halo (Ryzen AI MAX+) requires GTT (Graphics Translation Table) configuration to access more than ~33GB of memory for GPU workloads.
+
+**Latest Update (October 2025)**: Linux kernel 6.16.9+ includes UMA (Unified Memory Architecture) fixes that eliminate the need for manual GTT kernel parameters on many systems.
 
 ## The Problem
 
@@ -17,22 +20,32 @@ The AMD Strix Halo (Ryzen AI MAX+) currently limits GPU-accessible memory to ~33
 - Post Linux 6.10: ROCm allocates only in GTT (not reserved VRAM)
 - Pre Linux 6.10: ROCm allocates only in reserved VRAM
 
-## Available Solutions
+## Solutions
 
-### Solution 1: Kernel TTM Parameters (RECOMMENDED)
-**New method using Translation Table Manager (TTM):**
+### Solution 1: Upgrade to Kernel 6.16.9+ (RECOMMENDED)
+
+**Best option**: Upgrade to Linux kernel 6.16.9 or later. These kernels include UMA fixes and don't require manual GTT parameters.
 
 ```bash
-# Calculate the values:
-# For 96GB: (96 * 1024 * 1024) / 4.096 = 25165824
-# For 108GB: (108 * 1024 * 1024) / 4.096 = 27648000
+# Check your kernel version
+uname -r
 
-# Set kernel parameters for 108GB GTT (maximum safe)
-sudo grubby --update-kernel=ALL --args='amdttm.pages_limit=27648000'
-sudo grubby --update-kernel=ALL --args='amdttm.page_pool_size=27648000'
+# If 6.16.9+, no GTT parameters needed - it just works!
+```
 
-# Alternatively, edit /etc/default/grub:
-GRUB_CMDLINE_LINUX="amdttm.pages_limit=27648000 amdttm.page_pool_size=27648000"
+### Solution 2: Kernel Parameters (For Older Kernels)
+
+If using kernel 6.16.8 or earlier, configure GTT manually:
+
+```bash
+# For 108GB GTT (tested stable)
+# Calculation: (108 * 1024 * 1024) / 4.096 = 27648000
+
+# Edit /etc/default/grub:
+sudo nano /etc/default/grub
+
+# Add to GRUB_CMDLINE_LINUX_DEFAULT:
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash amdttm.pages_limit=27648000 amdttm.page_pool_size=27648000"
 
 # Update grub and reboot
 sudo update-grub
@@ -109,9 +122,9 @@ for size_gb in [32, 48, 64, 80, 96]:
 
 ### Community Findings
 - **Maximum Safe GTT**: 108GB before errors on Strix Halo
-- **Kernel Requirements**: Linux 6.10+ for improved GTT, 6.11+ recommended
-- **ROCm Status**: No official APU support, community patches available
-- **Performance**: ~50% below expected RDNA3 efficiency with current drivers
+- **Kernel 6.16.9+**: GTT parameters no longer needed (UMA fixes included)
+- **Kernel 6.14-6.16.8**: Requires `amdttm.pages_limit` parameter
+- **Kernel 6.10-6.13**: Requires `amdttm.pages_limit` parameter, less stable
 
 ## Alternative Approaches
 
@@ -155,17 +168,11 @@ model = AutoModelForCausalLM.from_pretrained(
 
 ## Recommendations
 
-### For Maximum Memory Access Now:
-1. Update to Linux kernel 6.11+
-2. Apply TTM kernel parameters for 108GB GTT
-3. Use environment variables for unified memory
-4. Consider Vulkan backends when possible
-
-### For Best Performance:
-1. Stay within 32GB for stability
-2. Use BF16 precision (1.6x faster than FP32)
-3. Monitor ROCm updates via TheRock community
-4. Test with each kernel/driver update
+### Best Path Forward:
+1. **Upgrade to kernel 6.16.9+** if possible (no manual configuration needed)
+2. **If on older kernel**: Apply TTM kernel parameters (108GB tested stable)
+3. Use environment variables for unified memory (HSA_XNACK=1)
+4. Consider Vulkan for inference workloads
 
 ## Quick Reference Commands
 
