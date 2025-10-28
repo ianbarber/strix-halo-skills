@@ -106,24 +106,34 @@ chmod +x $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 
 **Important**: Environment variables must be set BEFORE importing PyTorch. Setting them in Python won't work.
 
-### Diagnostic Commands
+## Problem 5: Kernel Upgrade Fails (DKMS Build Error)
 
-```bash
-# 1. Check if environment is set
-env | grep -E "HSA_|PYTORCH_|HIP_"
-
-# 2. Check if GPU is visible to system
-lspci | grep -i amd
-
-# 3. Check if amdgpu driver is loaded
-lsmod | grep amdgpu
-
-# 4. Check ROCm detection
-rocminfo | grep gfx1151
-
-# 5. Test in fresh Python
-python -c "import torch; print(torch.cuda.is_available())"
+**Symptom**: When upgrading kernel, DKMS build fails:
 ```
+Error! Bad return status for module build on kernel
+dkms autoinstall failed for amdgpu
+```
+
+**Cause**: amdgpu-dkms installed, but Strix Halo should use inbox kernel driver
+
+**Fix**: Remove DKMS and use inbox driver:
+```bash
+# Remove DKMS modules
+sudo dkms remove amdgpu/$(dkms status | grep amdgpu | head -1 | cut -d, -f2 | tr -d ' ') --all
+
+# Uninstall DKMS packages
+sudo apt remove amdgpu-dkms amdgpu-dkms-firmware -y
+
+# Fix broken installation
+sudo apt install -f
+
+# Reboot
+sudo reboot
+```
+
+After reboot, the kernel's built-in amdgpu driver will be used.
+
+**Note**: ROCm should be installed with `--no-dkms` flag for APUs.
 
 ## Diagnostic Commands
 

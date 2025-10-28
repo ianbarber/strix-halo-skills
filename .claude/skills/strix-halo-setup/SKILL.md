@@ -35,6 +35,8 @@ This skill should be invoked when:
 
 **PyTorch Installation**: Official PyTorch wheels from pytorch.org **DO NOT WORK** with gfx1151. They detect the GPU but fail on compute with "HIP error: invalid device function". This skill installs community builds that actually work.
 
+**ROCm Installation Note**: For Strix Halo APUs, ROCm should be installed with `--no-dkms` flag to use the inbox kernel driver. If you have amdgpu-dkms installed, it may cause issues when upgrading kernels.
+
 ## Prerequisites Check
 
 Before running setup, verify the system with:
