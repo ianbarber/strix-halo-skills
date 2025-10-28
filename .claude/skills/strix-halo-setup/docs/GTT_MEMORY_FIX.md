@@ -52,24 +52,7 @@ sudo update-grub
 sudo reboot
 ```
 
-### Solution 2: Manual GTT Configuration (Ubuntu/Debian)
-```bash
-# Edit GRUB configuration
-sudo nano /etc/default/grub
-
-# Add to GRUB_CMDLINE_LINUX_DEFAULT:
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash amdttm.pages_limit=27648000"
-
-# Update and reboot
-sudo update-grub
-sudo reboot
-
-# Verify after reboot
-dmesg | grep -i gtt
-cat /sys/class/drm/card*/device/mem_info_gtt_total
-```
-
-### Solution 3: Environment Variables (Partial Help)
+### Solution 3: Environment Variables (Supplemental)
 ```bash
 # Add to ~/.bashrc or /etc/environment
 export HSA_XNACK=1  # Enable unified memory page faults
