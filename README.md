@@ -89,7 +89,8 @@ Checks: hardware, ROCm, user groups, GTT, Python, PyTorch, and GPU compute.
 - Ubuntu 24.04 LTS (or similar)
 - ROCm 6.4.4+ or 7.0.2
 - User in `render` and `video` groups
-- 64GB+ RAM recommended for 30B models
+- 64GB+ RAM for 30B models
+- Linux kernel 6.14+ (6.16.9+ recommended for automatic memory configuration)
 
 ## FAQ
 

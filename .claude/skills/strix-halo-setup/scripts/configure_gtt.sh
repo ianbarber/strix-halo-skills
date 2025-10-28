@@ -6,22 +6,49 @@
 echo "AMD Strix Halo GTT Configuration Script"
 echo "========================================"
 echo ""
-echo "This will configure your system to allow the GPU to access up to 108GB of memory"
-echo "Current limit: 33.5GB"
-echo "Target limit: 108GB"
+
+# Check kernel version
+KERNEL_VERSION=$(uname -r)
+KERNEL_MAJOR=$(echo $KERNEL_VERSION | cut -d. -f1)
+KERNEL_MINOR=$(echo $KERNEL_VERSION | cut -d. -f2)
+KERNEL_PATCH=$(echo $KERNEL_VERSION | cut -d. -f3 | cut -d- -f1)
+
+echo "Current kernel: $KERNEL_VERSION"
 echo ""
 
-# Check current GTT size
+# Check if kernel 6.16.9+
+if [ "$KERNEL_MAJOR" -gt 6 ] || \
+   ([ "$KERNEL_MAJOR" -eq 6 ] && [ "$KERNEL_MINOR" -gt 16 ]) || \
+   ([ "$KERNEL_MAJOR" -eq 6 ] && [ "$KERNEL_MINOR" -eq 16 ] && [ "$KERNEL_PATCH" -ge 9 ]); then
+    echo "✓ Kernel 6.16.9+ detected!"
+    echo ""
+    echo "Good news: This kernel has automatic UMA (Unified Memory Architecture) support."
+    echo "You DON'T need to configure GTT parameters manually."
+    echo ""
+    echo "Your GPU should automatically have access to all system memory."
+    echo ""
+    echo "Verify with: python3 -c \"import torch; print(torch.cuda.get_device_properties(0).total_memory / 1e9, 'GB')\""
+    echo ""
+    exit 0
+fi
+
+echo "Kernel 6.16.8 or earlier detected - manual GTT configuration needed."
+echo ""
+echo "Note: Consider upgrading to kernel 6.16.9+ for automatic configuration."
+echo ""
+
+# Check current GTT size (find card dynamically)
 echo "Current GTT size:"
-if [ -f /sys/class/drm/card1/device/mem_info_gtt_total ]; then
-    current_gtt=$(cat /sys/class/drm/card1/device/mem_info_gtt_total)
+GTT_FILE=$(find /sys/class/drm/card*/device/mem_info_gtt_total 2>/dev/null | head -1)
+if [ -n "$GTT_FILE" ]; then
+    current_gtt=$(cat "$GTT_FILE")
     echo "  $(($current_gtt / 1024 / 1024 / 1024)) GB"
 else
     echo "  Unable to detect"
 fi
 
 echo ""
-echo "To increase GTT size, we need to modify kernel parameters."
+echo "This script will configure GTT to allow up to 108GB GPU-accessible memory."
 echo ""
 
 # Calculate TTM parameters for 108GB

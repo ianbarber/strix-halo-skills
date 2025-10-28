@@ -49,7 +49,7 @@ This checks:
 - GTT memory configuration
 - Python/Conda availability
 
-If any checks fail, see `.claude/skills/strix-halo-setup/docs/STRIX_HALO_COMPLETE_GUIDE.md` for detailed fix instructions.
+If any checks fail, see `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md` for detailed fix instructions.
 
 ## Setup Process
 
@@ -328,7 +328,9 @@ python -c "import torch; a=torch.tensor([1.0]).cuda(); print('✓ Works:', (a+1)
 
 **Cause**: GTT not configured (limited to ~33GB)
 
-**Solution**: Configure GTT memory:
+**Solution 1**: Upgrade to kernel 6.16.9+ (no configuration needed)
+
+**Solution 2**: For older kernels, configure GTT:
 ```bash
 .claude/skills/strix-halo-setup/scripts/configure_gtt.sh
 ```
@@ -419,6 +421,6 @@ For training or custom PyTorch code, set up PyTorch instead.
 
 ## Notes
 
-- GTT configuration is optional but required for 30B+ models
+- GTT configuration needed for 30B+ models on kernels before 6.16.9 (kernel 6.16.9+ has automatic UMA support)
 - Vulkan backend often provides better performance for inference
 - Use BF16 precision in PyTorch for better performance

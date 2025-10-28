@@ -95,13 +95,26 @@ echo ""
 
 # 4. Check GTT Configuration
 echo -e "${BLUE}[4/8] Checking GTT Memory Configuration...${NC}"
-if grep -q "amdttm.pages_limit" /proc/cmdline; then
+
+# Check kernel version first
+KERNEL_VERSION=$(uname -r)
+KERNEL_MAJOR=$(echo $KERNEL_VERSION | cut -d. -f1)
+KERNEL_MINOR=$(echo $KERNEL_VERSION | cut -d. -f2)
+KERNEL_PATCH=$(echo $KERNEL_VERSION | cut -d. -f3 | cut -d- -f1)
+
+# Check if kernel 6.16.9+
+if [ "$KERNEL_MAJOR" -gt 6 ] || \
+   ([ "$KERNEL_MAJOR" -eq 6 ] && [ "$KERNEL_MINOR" -gt 16 ]) || \
+   ([ "$KERNEL_MAJOR" -eq 6 ] && [ "$KERNEL_MINOR" -eq 16 ] && [ "$KERNEL_PATCH" -ge 9 ]); then
+    print_result "PASS" "Kernel $KERNEL_VERSION has automatic UMA support (no GTT config needed)"
+elif grep -q "amdttm.pages_limit" /proc/cmdline; then
     GTT_PARAM=$(grep -oP 'amdttm.pages_limit=\K[0-9]+' /proc/cmdline)
     GTT_GB=$((GTT_PARAM * 4096 / 1024 / 1024 / 1024))
     print_result "PASS" "GTT configured in kernel: ${GTT_GB}GB (pages_limit=$GTT_PARAM)"
 else
-    print_result "WARN" "GTT not configured in kernel (limited to ~33GB)"
-    echo "      For 30B+ models, configure GTT: ./configure_gtt.sh"
+    print_result "WARN" "GTT not configured (limited to ~33GB)"
+    echo "      Option 1: Upgrade to kernel 6.16.9+ (automatic)"
+    echo "      Option 2: Configure GTT: ./configure_gtt.sh"
 fi
 
 # Check actual GTT size (find correct card dynamically)
