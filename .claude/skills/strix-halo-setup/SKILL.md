@@ -4,9 +4,9 @@ description: Complete setup for AMD Strix Halo (Ryzen AI MAX+ 395) PyTorch envir
 license: MIT
 metadata:
   hardware: AMD Strix Halo (gfx1151)
-  supported_rocm: "6.4.4+"
-  tested_date: "2025-10-25"
-  skill_version: "1.0.0"
+  supported_rocm: "6.4.4+ or 7.x"
+  tested_date: "2026-01-23"
+  skill_version: "1.1.1"
 ---
 
 # Strix Halo Setup
@@ -46,10 +46,12 @@ Before running setup, verify the system with:
 ```
 
 This checks:
-- ROCm installation (6.4.4+ or 7.0.2 required)
+- ROCm installation (6.4.4+ or 7.x required)
 - User in `render` and `video` groups
 - GTT memory configuration
 - Python/Conda availability
+
+**ROCm 7.x Note**: ROCm 7.2+ offers significant performance improvements (~2.5x in BF16 compute). However, hipBLASLt is not fully optimized for gfx1151 yet and falls back to hipBLAS.
 
 If any checks fail, see `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md` for detailed fix instructions.
 
@@ -112,18 +114,20 @@ source {project_name}/bin/activate
 pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch torchvision torchaudio
 ```
 
-**Option 2: scottt's Stable Builds (Fallback)**
-If nightlies fail, use pre-built wheels from:
-https://github.com/scottt/rocm-TheRock/releases
+As of January 2026, this provides PyTorch 2.11.0a0+ with ROCm 7.11.0 support.
 
-Download and install with `pip install <wheel_file>`.
+**Option 2: TheRock Builds (Alternative)**
+Pre-built wheels from the official ROCm TheRock project:
+https://github.com/ROCm/TheRock/releases
+
+Look for `gfx1151` releases and install with `pip install <wheel_file>`.
 
 **Verify Installation**:
 ```bash
 python -c "import torch; print('PyTorch:', torch.__version__); print('HIP:', torch.version.hip)"
 ```
 
-Should show PyTorch 2.7+ and HIP 6.5+.
+Should show PyTorch 2.11+ and HIP 7.2+ with ROCm 7.x.
 
 ### Step 5: Configure Environment Variables
 
@@ -156,6 +160,12 @@ export ROCBLAS_USE_HIPBLASLT=1
 export AMD_LOG_LEVEL=0
 export HSA_CU_MASK=0xffffffffffffffff
 
+# ROCm 7.x stability fixes for APUs
+export HSA_ENABLE_SDMA=0  # Prevents checkerboard artifacts in VAE decodes
+
+# PyTorch memory management (recommended for 32GB+ workloads)
+export PYTORCH_HIP_ALLOC_CONF="backend:native,expandable_segments:True,garbage_collection_threshold:0.9"
+
 echo "✓ Strix Halo environment variables set"
 EOF
 
@@ -172,20 +182,20 @@ cat > $CONDA_PREFIX/etc/conda/deactivate.d/strix_halo_env.sh << 'EOF'
 
 unset HSA_OVERRIDE_GFX_VERSION PYTORCH_ROCM_ARCH HSA_XNACK HSA_FORCE_FINE_GRAIN_PCIE
 unset GPU_MAX_HEAP_SIZE GPU_MAX_ALLOC_PERCENT ROCR_VISIBLE_DEVICES HIP_VISIBLE_DEVICES
-unset ROCBLAS_USE_HIPBLASLT AMD_LOG_LEVEL HSA_CU_MASK
+unset ROCBLAS_USE_HIPBLASLT AMD_LOG_LEVEL HSA_CU_MASK HSA_ENABLE_SDMA PYTORCH_HIP_ALLOC_CONF
 EOF
 
 chmod +x $CONDA_PREFIX/etc/conda/deactivate.d/strix_halo_env.sh
 ```
 
-### Step 7: Create Project Structure
+### Step 6: Create Project Structure
 
 ```bash
 mkdir -p {project_name}/{scripts,notebooks,data,models,tests}
 cd {project_name}
 ```
 
-### Step 8: Copy Test Scripts
+### Step 7: Copy Test Scripts
 
 Copy the test scripts from the skill directory:
 
@@ -194,7 +204,7 @@ cp .claude/skills/strix-halo-setup/scripts/*.py scripts/
 chmod +x scripts/*.py
 ```
 
-### Step 9: Create Project README
+### Step 8: Create Project README
 
 Create a README with project-specific information:
 
@@ -226,7 +236,7 @@ python scripts/test_memory.py
 
 ## Hardware Capabilities
 
-- **Compute**: ~7 TFLOPS FP32, ~12 TFLOPS BF16
+- **Compute**: ~7 TFLOPS FP32, ~31 TFLOPS BF16 (with ROCm 7.x)
 - **Memory**: Up to 113GB GPU-accessible (with GTT configuration)
 - **Model Capacity**: 30B parameter models in FP16
 
@@ -243,13 +253,13 @@ If compute fails with "HIP error: invalid device function":
 - You're using official PyTorch wheels (don't work with gfx1151)
 - Reinstall: `pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch`
 
-For more help, see `.claude/skills/strix-halo-setup/docs/COMPLETE_GUIDE.md`
+For more help, see `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md`
 
 Created: {date}
 EOF
 ```
 
-### Step 10: Verify Installation
+### Step 9: Verify Installation
 
 Reactivate the environment to load variables:
 
@@ -278,7 +288,7 @@ STRIX HALO GPU TEST
 ============================================================
 ```
 
-### Step 11: Final Summary
+### Step 10: Final Summary
 
 Tell the user:
 
@@ -291,10 +301,9 @@ Location: {full_path}
 Next steps:
   1. Test GPU: python scripts/test_gpu_simple.py
   2. Test memory: python scripts/test_memory.py
-  3. Try a model: See docs/COMPLETE_GUIDE.md for examples
 
 Hardware capabilities:
-  - 7-12 TFLOPS compute (FP32/BF16)
+  - 7 TFLOPS FP32 / 31 TFLOPS BF16 (ROCm 7.x)
   - 113 GB GPU-accessible memory
   - Can run 30B parameter models in FP16
 
@@ -349,15 +358,6 @@ sudo usermod -aG render,video $USER
 # Log out and back in (or reboot)
 groups | grep -E "render|video"  # Verify
 ```
-
-## References
-
-- **Complete Guide**: `.claude/skills/strix-halo-setup/docs/STRIX_HALO_COMPLETE_GUIDE.md`
-- **Troubleshooting**: `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md`
-- **GTT Configuration**: `.claude/skills/strix-halo-setup/docs/GTT_MEMORY_FIX.md`
-- **Community PyTorch**: https://github.com/scottt/rocm-TheRock/releases
-
----
 
 ## Vulkan Setup (Alternative to PyTorch)
 
@@ -419,10 +419,34 @@ For training or custom PyTorch code, set up PyTorch instead.
 
 - **Troubleshooting**: `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md`
 - **GTT Configuration**: `.claude/skills/strix-halo-setup/docs/GTT_MEMORY_FIX.md`
-- **Community PyTorch**: https://github.com/scottt/rocm-TheRock/releases
+- **Community PyTorch**: https://github.com/ROCm/TheRock/releases
 
 ## Notes
 
 - GTT configuration needed for 30B+ models on kernels before 6.16.9 (kernel 6.16.9+ has automatic UMA support)
 - Vulkan backend often provides better performance for inference
 - Use BF16 precision in PyTorch for better performance
+
+## ROCm 7.x Considerations
+
+**Benefits of ROCm 7.2+:**
+- Up to 5x performance improvement in image generation (ComfyUI, Flux, SDXL)
+- ~2.5x improvement in BF16 compute (31 TFLOPS vs 12 TFLOPS on ROCm 6.x)
+- Unified Windows/Linux release
+- Better long-term support path
+- JAX 0.8.0 support
+
+**Known Limitations on gfx1151 (as of ROCm 7.2):**
+- **hipBLASLt**: Falls back to hipBLAS (slower) due to unsupported architecture
+- **LLM Decode**: Memory-copy bound (~92-95% time in hipMemcpyWithStream), limiting token throughput
+- **Flash Attention**: May require `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1` and still has issues
+
+**Deprecations in ROCm 7.2:**
+- HIPCC is deprecated; AMD Clang should be used directly for compilation
+- ROCTracer, ROCProfiler, rocprof, rocprofv2 are deprecated; use ROCprofiler-SDK and AMD SMI instead
+
+**Recommended Environment Variables for ROCm 7.x:**
+```bash
+export HSA_ENABLE_SDMA=0  # Prevents artifacts in VAE decodes
+export PYTORCH_HIP_ALLOC_CONF="backend:native,expandable_segments:True,garbage_collection_threshold:0.9"
+```

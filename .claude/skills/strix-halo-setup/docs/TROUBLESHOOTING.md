@@ -6,7 +6,7 @@
 
 ```bash
 # Run the verification script
-./claude/skills/strix-halo-setup/scripts/verify_system.sh
+./.claude/skills/strix-halo-setup/scripts/verify_system.sh
 ```
 
 This checks all prerequisites and identifies specific issues.
@@ -35,7 +35,7 @@ rocm-smi
 # Should show: GPU[0] gfx1151
 ```
 
-If not, install ROCm 6.4.4+ or 7.0.2 (see skill documentation).
+If not, install ROCm 6.4.4+ or 7.x (see skill documentation).
 
 ### Check PyTorch Has ROCm Support
 
@@ -76,7 +76,7 @@ python -c "import torch; a=torch.tensor([1.0]).cuda(); print((a+1).item())"
 **Fix:**
 ```bash
 # Run the GTT configuration script
-./claude/skills/strix-halo-setup/scripts/configure_gtt.sh
+./.claude/skills/strix-halo-setup/scripts/configure_gtt.sh
 ```
 
 Or manually add to GRUB (kernels before 6.16.9):
@@ -134,6 +134,65 @@ sudo reboot
 After reboot, the kernel's built-in amdgpu driver will be used.
 
 **Note**: ROCm should be installed with `--no-dkms` flag for APUs.
+
+## Problem 6: Checkerboard Artifacts in Image Generation (ROCm 7.x)
+
+**Symptom**: When running SD3.5XL, FLUX, or other large VAE decodes, you see checkerboard or corrupted patterns in output images.
+
+**Cause**: SDMA (System DMA) issues on APUs with ROCm 7.x
+
+**Fix**: Disable SDMA:
+```bash
+export HSA_ENABLE_SDMA=0
+```
+
+Add this to your conda activation script for permanent fix.
+
+## Problem 7: hipBLASLt Unsupported Architecture Warning (ROCm 7.x)
+
+**Symptom**: Warning messages about hipBLASLt falling back to hipBLAS:
+```
+hipBLASLt: unsupported architecture gfx1151, falling back to hipBLAS
+```
+
+**Cause**: hipBLASLt fastpath not yet optimized for gfx1151
+
+**Status**: This is a known limitation as of ROCm 7.2. The fallback works correctly but is slower. AMD is working on native gfx1151 support.
+
+**Workaround**: None needed - the fallback is automatic. For best performance, consider Vulkan backend for inference-only workloads.
+
+## Problem 8: Slow LLM Token Generation
+
+**Symptom**: LLM inference shows low tokens/second (~1-2 tok/s on 70B models), much slower than expected.
+
+**Cause**: On gfx1151, LLM decode is memory-copy bound. Profiling shows ~92-95% of time in `hipMemcpyWithStream` rather than compute kernels.
+
+**Mitigations**:
+1. Use smaller models (7B-13B) for better throughput
+2. Use Vulkan backend with llama.cpp for inference (often faster)
+3. Use BF16 instead of FP32 where possible
+4. Set memory allocation optimizations:
+   ```bash
+   export PYTORCH_HIP_ALLOC_CONF="backend:native,expandable_segments:True,garbage_collection_threshold:0.9"
+   ```
+
+## Problem 9: Mixed ROCm Version Installation
+
+**Symptom**: `rocm-smi --version` shows different versions for different components (e.g., ROCm 6.4.2 base but rocm-smi-lib 7.5.0)
+
+**Cause**: Partial upgrade or multiple ROCm installations
+
+**Fix**: Clean install ROCm:
+```bash
+# Remove existing ROCm
+sudo apt purge rocm* hip* 2>/dev/null
+sudo apt autoremove -y
+
+# Clean up directories
+sudo rm -rf /opt/rocm*
+
+# Fresh install (see installation section)
+```
 
 ## Diagnostic Commands
 

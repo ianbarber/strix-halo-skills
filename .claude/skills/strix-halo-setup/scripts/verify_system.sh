@@ -68,9 +68,10 @@ if command_exists rocm-smi; then
     fi
 else
     print_result "FAIL" "ROCm not installed (rocm-smi not found)"
-    echo "      Install: wget https://repo.radeon.com/amdgpu-install/6.4.4/ubuntu/noble/amdgpu-install_6.4.60402-1_all.deb"
-    echo "               sudo apt install ./amdgpu-install_6.4.60402-1_all.deb"
-    echo "               sudo amdgpu-install --usecase=rocm --no-dkms"
+    echo "      Install ROCm 7.2: See https://rocm.docs.amd.com/projects/install-on-linux/en/latest/"
+    echo "      Or ROCm 6.4.4:    wget https://repo.radeon.com/amdgpu-install/6.4.4/ubuntu/noble/amdgpu-install_6.4.60402-1_all.deb"
+    echo "                        sudo apt install ./amdgpu-install_6.4.60402-1_all.deb"
+    echo "                        sudo amdgpu-install --usecase=rocm --no-dkms"
 fi
 echo ""
 

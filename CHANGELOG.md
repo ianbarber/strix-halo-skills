@@ -2,6 +2,38 @@
 
 All notable changes to the Strix Halo Skills project will be documented in this file.
 
+## [1.1.1] - January 23, 2026
+
+### ROCm 7.2 Support and Verified Performance
+
+**Added:**
+- ROCm 7.x compatibility documentation and environment variables
+- `HSA_ENABLE_SDMA=0` environment variable to prevent VAE decode artifacts
+- `PYTORCH_HIP_ALLOC_CONF` settings for better memory management
+- New troubleshooting entries for ROCm 7.x specific issues (Problems 6-9)
+- ROCm 7.x considerations section in SKILL.md
+
+**Updated:**
+- Supported ROCm versions: now "6.4.4+ or 7.x"
+- PyTorch installation instructions with January 2026 nightly info (2.11.0a0+)
+- Changed community builds reference from scottt to official ROCm/TheRock
+- Verified BF16 performance: **31 TFLOPS** (up from 12 TFLOPS on ROCm 6.x)
+- Hardware capabilities documentation with verified numbers
+- Fixed path typos in TROUBLESHOOTING.md and README.md
+
+**Documented:**
+- ROCm 7.2 benefits (up to 5x in image generation, 2.5x in BF16 compute)
+- Known gfx1151 limitations (hipBLASLt fallback, memcpy-bound LLM decode)
+- HIPCC deprecation (use AMD Clang directly)
+- ROCTracer/ROCProfiler deprecation (use ROCprofiler-SDK)
+
+**Tested Configuration:**
+- ROCm: 7.2.0 (system) + 7.11.0 nightlies (PyTorch)
+- Kernel: 6.17.0-1005-oem
+- PyTorch: 2.11.0a0+rocm7.11.0a20260106
+
+---
+
 ## [1.0.0] - October 23, 2025
 
 ### Initial Release
@@ -102,11 +134,11 @@ All notable changes to the Strix Halo Skills project will be documented in this 
 ### Planned for Future Versions
 
 - Examples directory with working inference scripts
-- Support for ROCm 7.0+ when stable
-- Windows setup instructions (ROCm 6.4.4+ supports Windows)
+- Windows setup instructions (ROCm 7.2+ has unified Windows/Linux release)
 - Model compatibility matrix
 - Performance tuning guide
 - Video walkthrough
+- hipBLASLt native gfx1151 support (pending AMD updates)
 
 ### How to Report Issues
 

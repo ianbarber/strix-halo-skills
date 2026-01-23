@@ -62,7 +62,7 @@ Tested on 64GB RAM system with GTT configured:
 
 - 30B parameter models in FP16
 - 113GB GPU-accessible memory
-- Works with ROCm 6.4.4+ or 7.0.2
+- Works with ROCm 6.4.4+ or 7.x
 
 ## Model Support
 
@@ -78,7 +78,7 @@ Tested on 64GB RAM system with GTT configured:
 Check your system before setup:
 
 ```bash
-./claude/skills/strix-halo-setup/scripts/verify_system.sh
+./.claude/skills/strix-halo-setup/scripts/verify_system.sh
 ```
 
 Checks: hardware, ROCm, user groups, GTT, Python, PyTorch, and GPU compute.
@@ -87,7 +87,7 @@ Checks: hardware, ROCm, user groups, GTT, Python, PyTorch, and GPU compute.
 
 - AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151)
 - Ubuntu 24.04 LTS (or similar)
-- ROCm 6.4.4+ or 7.0.2
+- ROCm 6.4.4+ or 7.x
 - User in `render` and `video` groups
 - 64GB+ RAM for 30B models
 - Linux kernel 6.14+ (6.16.9+ recommended for automatic memory configuration)
@@ -108,7 +108,7 @@ You're using official PyTorch wheels. Reinstall with community builds (see skill
 
 ## Community Resources
 
-- PyTorch Wheels: https://github.com/scottt/rocm-TheRock/releases
+- PyTorch Wheels: https://github.com/ROCm/TheRock/releases
 - ROCm Community: https://github.com/ROCm/TheRock/discussions/655
 - Strix Halo Info: https://llm-tracker.info/_TOORG/Strix-Halo
 
