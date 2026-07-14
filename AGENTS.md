@@ -4,13 +4,13 @@ This document provides guidance for AI agents (like Claude Code) when making cha
 
 ## Repository Purpose
 
-This is a **Claude Code skills package** for AMD Strix Halo (Ryzen AI MAX+ 395) hardware. The goal is to help users set up PyTorch environments for running ML workloads, particularly large language models up to 30B parameters.
+This is a **Claude Code skills package** for AMD Strix Halo (Ryzen AI MAX+ 395) hardware. The goal is to help users set up and validate PyTorch environments for ML workloads that benefit from the APU's unified memory.
 
 ## Key Principles
 
 1. **Self-Contained Skill**: Everything users need is in `.claude/skills/strix-halo-setup/`
 2. **Tested on Real Hardware**: All claims should be verifiable with actual testing
-3. **Focused on Core Setup**: Get PyTorch working, GTT configured, basic verification
+3. **Focused on Core Setup**: Get PyTorch working, inspect GTT, and verify real kernels
 4. **Minimal Root Clutter**: Keep root directory clean with only essential docs
 
 ## When Making Changes
@@ -27,6 +27,7 @@ When modifying the skill:
 - Keep SKILL.md focused on setup steps
 - Update docs/TROUBLESHOOTING.md for new issues
 - Update scripts/ if verification logic changes
+- Keep the supported and TheRock installation tracks clearly separated
 - Test scripts on actual hardware if possible
 - Ensure all file paths are relative to project root
 
@@ -102,7 +103,7 @@ Before committing changes that affect functionality:
 
 1. Add to `.claude/skills/strix-halo-setup/scripts/`
 2. Make executable: `chmod +x script.sh`
-3. Document in skill's README.md
+3. Document in SKILL.md or the relevant file under docs/
 4. Reference from SKILL.md if part of setup
 5. Add to CHANGELOG.md
 
@@ -122,12 +123,13 @@ Before committing changes that affect functionality:
 - LICENSE (MIT)
 - .gitignore
 - AGENTS.md (this file)
-- .claude.md (loads this file)
+- CLAUDE.md (loads this file)
 
 ### Keep in Skill Directory (.claude/skills/strix-halo-setup/)
 - SKILL.md (main skill with YAML frontmatter)
-- README.md (skill-specific documentation)
 - scripts/ (all verification and setup scripts)
+- docs/INSTALLATION.md (supported and experimental install tracks)
+- docs/PERFORMANCE_FEATURES.md (bounded feature validation)
 - docs/TROUBLESHOOTING.md (common issues)
 - docs/GTT_MEMORY_FIX.md (if still needed after simplification)
 
@@ -143,8 +145,8 @@ Before committing changes that affect functionality:
 
 **In scope**:
 - ROCm verification
-- PyTorch installation (community builds)
-- GTT configuration
+- PyTorch installation (AMD-supported or TheRock multi-arch builds)
+- GTT inspection and configuration guidance
 - Basic environment setup
 - Verification testing
 
@@ -152,7 +154,7 @@ Before committing changes that affect functionality:
 - Model-specific setup (Llama, Mistral, etc.)
 - Framework integration (LangChain, vLLM, etc.)
 - Advanced training techniques
-- Performance tuning beyond basics
+- Performance tuning beyond bounded capability checks
 - Windows-specific setup (mention it exists, but focus on Linux)
 
 ## Community Engagement

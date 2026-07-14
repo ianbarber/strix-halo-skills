@@ -1,225 +1,106 @@
-# Troubleshooting AMD Strix Halo Setup
+# Troubleshooting
 
-## Common Issues
-
-### Quick Diagnosis
+Start by preserving the exact error and collecting facts from the affected
+environment:
 
 ```bash
-# Run the verification script
 ./.claude/skills/strix-halo-setup/scripts/verify_system.sh
+python .claude/skills/strix-halo-setup/scripts/verify_pytorch.py --verbose
+python -m torch.utils.collect_env
+python -m pip freeze
+env | grep -E '^(AMD|GPU|HIP|HSA|ROCBLAS|ROCR|TORCH|PYTORCH)_'
 ```
 
-This checks all prerequisites and identifies specific issues.
+## GPU Enumerates but Compute Fails
 
-## Problem 1: GPU Not Detected
+Symptoms include `invalid device function`, `no kernel image`, or a failure on
+the first tensor operation.
 
-**Symptom**: `torch.cuda.is_available()` returns `False`
+1. Check `gcnArchName` in `verify_pytorch.py` output. It must contain `gfx1151`.
+2. For TheRock, confirm both device packages are installed:
 
-### Most Common Cause: User Groups
-
-**Check:**
-```bash
-groups | grep -E "render|video"
-```
-
-**Fix:**
-```bash
-sudo usermod -aG render,video $USER
-# Log out and back in (or reboot)
-```
-
-### Check ROCm Installation
-
-```bash
-rocm-smi
-# Should show: GPU[0] gfx1151
-```
-
-If not, install ROCm 6.4.4+ or 7.x (see skill documentation).
-
-### Check PyTorch Has ROCm Support
-
-```bash
-python -c "import torch; print(hasattr(torch.version, 'hip'))"
-# Should print: True
-```
-
-If False, you have CPU-only PyTorch. Install ROCm version.
-
-## Problem 2: GPU Detected But Compute Fails
-
-**Symptom**: `torch.cuda.is_available()` is `True` but operations fail with:
-```
-RuntimeError: HIP error: invalid device function
-```
-
-**Cause**: Using official PyTorch wheels (don't work with gfx1151)
-
-**Fix**: Install community builds:
-```bash
-pip uninstall torch torchvision torchaudio
-pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch
-```
-
-**Verify:**
-```bash
-python -c "import torch; a=torch.tensor([1.0]).cuda(); print((a+1).item())"
-# Should print: 2.0
-```
-
-## Problem 3: Out of Memory with Models < 30GB
-
-**Symptom**: OOM errors with models that should fit
-
-**Cause**: GTT not configured (limited to ~33GB)
-
-**Fix:**
-```bash
-# Run the GTT configuration script
-./.claude/skills/strix-halo-setup/scripts/configure_gtt.sh
-```
-
-Or manually add to GRUB (kernels before 6.16.9):
-```bash
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash amdttm.pages_limit=27648000 amdttm.page_pool_size=27648000"
-```
-
-**Note**: Kernel 6.16.9+ doesn't need GTT parameters.
-
-## Problem 4: Environment Variables
-
-**Symptom**: GPU works sometimes, not others
-
-**Cause**: Environment variables not set consistently
-
-**Fix**: Use conda activation scripts (the skill does this automatically):
-
-```bash
-mkdir -p $CONDA_PREFIX/etc/conda/activate.d
-cat > $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh << 'EOF'
-export HSA_OVERRIDE_GFX_VERSION=11.5.1
-export PYTORCH_ROCM_ARCH=gfx1151
-export HSA_XNACK=1
-EOF
-chmod +x $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-```
-
-**Important**: Environment variables must be set BEFORE importing PyTorch. Setting them in Python won't work.
-
-## Problem 5: Kernel Upgrade Fails (DKMS Build Error)
-
-**Symptom**: When upgrading kernel, DKMS build fails:
-```
-Error! Bad return status for module build on kernel
-dkms autoinstall failed for amdgpu
-```
-
-**Cause**: amdgpu-dkms installed, but Strix Halo should use inbox kernel driver
-
-**Fix**: Remove DKMS and use inbox driver:
-```bash
-# Remove DKMS modules
-sudo dkms remove amdgpu/$(dkms status | grep amdgpu | head -1 | cut -d, -f2 | tr -d ' ') --all
-
-# Uninstall DKMS packages
-sudo apt remove amdgpu-dkms amdgpu-dkms-firmware -y
-
-# Fix broken installation
-sudo apt install -f
-
-# Reboot
-sudo reboot
-```
-
-After reboot, the kernel's built-in amdgpu driver will be used.
-
-**Note**: ROCm should be installed with `--no-dkms` flag for APUs.
-
-## Problem 6: Checkerboard Artifacts in Image Generation (ROCm 7.x)
-
-**Symptom**: When running SD3.5XL, FLUX, or other large VAE decodes, you see checkerboard or corrupted patterns in output images.
-
-**Cause**: SDMA (System DMA) issues on APUs with ROCm 7.x
-
-**Fix**: Disable SDMA:
-```bash
-export HSA_ENABLE_SDMA=0
-```
-
-Add this to your conda activation script for permanent fix.
-
-## Problem 7: hipBLASLt Unsupported Architecture Warning (ROCm 7.x)
-
-**Symptom**: Warning messages about hipBLASLt falling back to hipBLAS:
-```
-hipBLASLt: unsupported architecture gfx1151, falling back to hipBLAS
-```
-
-**Cause**: hipBLASLt fastpath not yet optimized for gfx1151
-
-**Status**: This is a known limitation as of ROCm 7.2. The fallback works correctly but is slower. AMD is working on native gfx1151 support.
-
-**Workaround**: None needed - the fallback is automatic. For best performance, consider Vulkan backend for inference-only workloads.
-
-## Problem 8: Slow LLM Token Generation
-
-**Symptom**: LLM inference shows low tokens/second (~1-2 tok/s on 70B models), much slower than expected.
-
-**Cause**: On gfx1151, LLM decode is memory-copy bound. Profiling shows ~92-95% of time in `hipMemcpyWithStream` rather than compute kernels.
-
-**Mitigations**:
-1. Use smaller models (7B-13B) for better throughput
-2. Use Vulkan backend with llama.cpp for inference (often faster)
-3. Use BF16 instead of FP32 where possible
-4. Set memory allocation optimizations:
    ```bash
-   export PYTORCH_HIP_ALLOC_CONF="backend:native,expandable_segments:True,garbage_collection_threshold:0.9"
+   python -m pip show rocm-sdk-device-gfx1151 amd-torch-device-gfx1151
    ```
 
-## Problem 9: Mixed ROCm Version Installation
+3. Remove `HSA_OVERRIDE_GFX_VERSION`; it can make an incompatible package get
+   past detection but cannot add missing kernels.
+4. Recreate the environment from one track in [INSTALLATION.md](INSTALLATION.md).
 
-**Symptom**: `rocm-smi --version` shows different versions for different components (e.g., ROCm 6.4.2 base but rocm-smi-lib 7.5.0)
+## torch.cuda.is_available() Is False
 
-**Cause**: Partial upgrade or multiple ROCm installations
-
-**Fix**: Clean install ROCm:
-```bash
-# Remove existing ROCm
-sudo apt purge rocm* hip* 2>/dev/null
-sudo apt autoremove -y
-
-# Clean up directories
-sudo rm -rf /opt/rocm*
-
-# Fresh install (see installation section)
-```
-
-## Diagnostic Commands
+Check the host before reinstalling Python packages:
 
 ```bash
-# Check GPU visibility
-lspci | grep -i amd
-rocm-smi
-rocminfo | grep gfx1151
-
-# Check PyTorch installation
-python -c "import torch; print('PyTorch:', torch.__version__); print('HIP:', torch.version.hip if hasattr(torch.version, 'hip') else 'None')"
-
-# Test GPU detection
-python -c "import torch; print('GPU detected:', torch.cuda.is_available())"
-
-# Test compute
-python -c "import torch; a=torch.tensor([1.0]).cuda(); print('Compute works:', (a+1).item())"
-
-# Check environment variables
-env | grep -E "HSA_|PYTORCH_|ROCM_"
+rocminfo | grep -A2 -B2 gfx1151
+ls -l /dev/kfd /dev/dri/renderD*
+id -nG
 ```
 
-## When Everything Works
+The user needs access to `/dev/kfd` and a DRM render node and normally belongs
+to `render` and `video`. Log out and back in after group changes. In containers,
+pass `/dev/kfd`, `/dev/dri`, the required groups, and sufficient shared memory.
 
-You should see:
-- `torch.cuda.is_available()` returns `True`
-- Compute operations complete without HIP errors
-- Can allocate 30GB+ tensors (with GTT configured)
+## Flash Attention Is Unavailable
 
-If using the skill-created environment, variables are auto-configured via conda activation scripts.
+Run the feature in a new process so the AOTriton switch is set before PyTorch
+imports:
+
+```bash
+TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 \
+  python .claude/skills/strix-halo-setup/scripts/verify_pytorch.py \
+    --require flash_attention --verbose
+```
+
+If it fails, record the resolved torch, Triton, ROCm, and gfx1151 device-package
+versions. Flash dispatch also depends on dtype, head dimension, masks, dropout,
+and backward requirements; compare the failing model shape with the bounded
+probe. Do not assume a third-party FlashAttention wheel supports gfx1151.
+
+## torch.compile Fails
+
+First prove eager FP16 and the default capability checks. Then run:
+
+```bash
+python .claude/skills/strix-halo-setup/scripts/verify_pytorch.py \
+  --require compile --verbose
+```
+
+Use a fresh TheRock multi-arch environment if the supported stack lacks a fix.
+Keep eager execution as the fallback. Do not combine a Triton wheel from one
+track with torch from another.
+
+## Convolution or Diffusion Artifacts
+
+Run the convolution probe before changing HSA runtime behavior. If corruption
+is reproducible, test a workaround in one process:
+
+```bash
+HSA_ENABLE_SDMA=0 python your_reproducer.py
+```
+
+This disables DMA copies and can reduce performance. Keep it only if it fixes a
+captured reproducer on the installed versions; report that reproducer upstream.
+
+## Out of Memory
+
+1. Read physical RAM, GTT, and VRAM as separate overlapping views with
+   `configure_gtt.sh`.
+2. Watch system memory and swap as well as PyTorch allocator statistics.
+3. Reduce batch size, context, precision, or cache before changing the host.
+4. If the real workload is GTT-limited, follow
+   [GTT_MEMORY_FIX.md](GTT_MEMORY_FIX.md) and keep OS/CPU headroom.
+
+Do not use VRAM plus GTT as a capacity estimate, and do not validate capacity by
+allocating uninitialized tensors without running the workload.
+
+## Nightly Regression
+
+Create a second fresh environment instead of upgrading the last working one.
+Query TheRock's current CI status and open issues, compare both environments
+with the same verifier command, and include `collect_env` plus `pip freeze` in
+the report.
+
+- [TheRock CI dashboard](https://therock-hud-dev.amd.com/)
+- [TheRock issues](https://github.com/ROCm/TheRock/issues)
+- [TheRock supported GPU status](https://github.com/ROCm/TheRock/blob/main/SUPPORTED_GPUS.md)

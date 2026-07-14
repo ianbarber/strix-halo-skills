@@ -1,452 +1,165 @@
 ---
 name: strix-halo-setup
-description: Complete setup for AMD Strix Halo (Ryzen AI MAX+ 395) PyTorch environments. Handles ROCm installation verification, PyTorch community builds (official wheels don't work with gfx1151), GTT memory configuration, and environment setup. Creates ready-to-use ML workspaces for running 30B parameter models.
+description: Set up and diagnose PyTorch ROCm environments on AMD Strix Halo (gfx1151) Linux systems. Use for selecting a supported or TheRock nightly stack, verifying real GPU kernels and attention backends, inspecting unified-memory limits, or troubleshooting invalid-device-function and out-of-memory failures.
 license: MIT
 metadata:
   hardware: AMD Strix Halo (gfx1151)
-  supported_rocm: "6.4.4+ or 7.x"
-  tested_date: "2026-01-23"
-  skill_version: "1.1.1"
+  supported_rocm: "ROCm 7.2.1/PyTorch 2.9.1 supported; TheRock multi-arch nightlies experimental"
+  tested_date: "2026-07-14"
+  skill_version: "2.0.0"
 ---
 
-# Strix Halo Setup
+# Strix Halo PyTorch Setup
 
-Set up a new PyTorch project optimized for AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151).
+Set up a reproducible gfx1151 environment, then prove the capabilities the
+workload needs. Do not infer support from GPU enumeration or a large allocation.
 
-## When Claude Should Use This Skill
+## Workflow
 
-This skill should be invoked when:
-- Setting up PyTorch on AMD Strix Halo (Ryzen AI MAX+ 395, gfx1151) hardware
-- User reports "HIP error: invalid device function" with PyTorch on AMD APU
-- Configuring environments for running LLMs on AMD integrated graphics
-- User mentions needing GTT memory configuration for ML workloads
-- Creating a new ML project specifically for Strix Halo hardware
-- User asks about running 30B parameter models on AMD Ryzen AI MAX+
+1. Run the system verifier from the repository root:
 
-## What This Skill Does
+   ```bash
+   ./.claude/skills/strix-halo-setup/scripts/verify_system.sh
+   ```
 
-1. Verifies system configuration (ROCm, GTT, user groups)
-2. Creates a conda environment with working PyTorch for gfx1151
-3. Sets up proper environment variables
-4. Creates test scripts to verify GPU functionality
-5. Provides a complete project template with best practices
+2. Choose an installation track with the user:
 
-## Critical Information
+   | Track | Use when | Tradeoff |
+   | --- | --- | --- |
+   | AMD supported | Stability and AMD's validated matrix matter most | Older PyTorch and kernel stack |
+   | TheRock multi-arch | New PyTorch, Triton, AOTriton, or rapid gfx1151 fixes matter most | Moving nightly packages; regressions are possible |
 
-**PyTorch Installation**: Official PyTorch wheels from pytorch.org **DO NOT WORK** with gfx1151. They detect the GPU but fail on compute with "HIP error: invalid device function". This skill installs community builds that actually work.
+   Default to the AMD supported track unless the user explicitly prioritizes
+   new features or agrees to nightly risk. See [installation details](docs/INSTALLATION.md).
 
-**ROCm Installation Note**: For Strix Halo APUs, ROCm should be installed with `--no-dkms` flag to use the inbox kernel driver. If you have amdgpu-dkms installed, it may cause issues when upgrading kernels.
+3. Create a fresh Python 3.12 virtual environment. Never install these wheels
+   into the system Python or an existing environment unless the user requests it.
 
-## Prerequisites Check
+4. Install one track. Do not combine AMD supported wheels, PyTorch.org wheels,
+   old per-family TheRock wheels, or multi-arch TheRock packages in one
+   environment.
 
-Before running setup, verify the system with:
+5. Run the capability verifier:
 
-```bash
-./scripts/verify_system.sh
-```
+   ```bash
+   python .claude/skills/strix-halo-setup/scripts/verify_pytorch.py
+   ```
 
-This checks:
-- ROCm installation (6.4.4+ or 7.x required)
-- User in `render` and `video` groups
-- GTT memory configuration
-- Python/Conda availability
+6. For AOTriton flash attention, start a new process with the experimental
+   switch and force the backend during verification:
 
-**ROCm 7.x Note**: ROCm 7.2+ offers significant performance improvements (~2.5x in BF16 compute). However, hipBLASLt is not fully optimized for gfx1151 yet and falls back to hipBLAS.
+   ```bash
+   TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 \
+     python .claude/skills/strix-halo-setup/scripts/verify_pytorch.py \
+       --require flash_attention
+   ```
 
-If any checks fail, see `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md` for detailed fix instructions.
+7. Capture the resolved environment after it passes:
 
-## Setup Process
+   ```bash
+   python -m torch.utils.collect_env > collect-env.txt
+   python -m pip freeze > requirements-lock.txt
+   ```
 
-### Step 1: System Verification
+## Installation Tracks
 
-Run the verification script:
+### AMD Supported
 
-```bash
-cd .claude/skills/strix-halo-setup
-./scripts/verify_system.sh
-```
+AMD's ROCm 7.2.1 Ryzen matrix validates gfx1151 with Python 3.12, PyTorch
+2.9.1, and FP16. Install AMD's exact `repo.radeon.com` wheels as documented in
+[INSTALLATION.md](docs/INSTALLATION.md), not similarly named PyTorch.org wheels.
 
-Expected output:
-- ✓ AMD GPU detected
-- ✓ ROCm installed
-- ✓ User in render/video groups
-- ✓ GTT configured (or warning if not)
+Use this track when reproducibility is more important than the newest compiler
+or attention work.
 
-If issues found, follow the script's instructions to fix them.
+### TheRock Multi-Arch Nightly
 
-### Step 2: Determine Project Name and Backend
+TheRock replaced new per-family releases with a unified multi-architecture
+index. Follow the exact [TheRock multi-arch installation](docs/INSTALLATION.md#therock-multi-arch-nightly)
+and select gfx1151 through the `device-gfx1151` package extras.
 
-Ask the user for:
-1. **Project name**: If not specified, use `strix-ml-project`
-2. **Backend choice**: PyTorch (training/custom code) or Vulkan (inference only)
+Do not add `--pre` by default. The index already publishes ROCm development
+builds behind stable-looking PyTorch versions; `--pre` may select a newer
+PyTorch alpha. Always record the resolved versions and retain the environment
+until its replacement passes the same capability checks.
 
-Use the AskUserQuestion tool:
+## Runtime Configuration
 
-**Question 1**: "What would you like to name your project?"
-**Question 2**: "Which backend do you want to set up?"
-- **PyTorch with ROCm**: For training, custom code, full ML framework (supports transformers, etc.)
-- **Vulkan**: For inference only (llama.cpp, Ollama) - simpler setup, often faster
+Start with no Strix-specific environment overrides. Current packages already
+identify gfx1151, select visible devices, and choose BLAS/allocator defaults.
 
-If PyTorch is chosen, continue with steps below. If Vulkan, skip to Vulkan setup section at the end.
-
-### Step 3: Create Environment
-
-**Using Conda (Recommended)**:
-```bash
-# Create new environment with Python 3.14 (or 3.13)
-conda create -n {project_name} python=3.14 -y
-conda activate {project_name}
-```
-
-**Using uv (Alternative)**:
-```bash
-# Create new environment with Python 3.14 (or 3.13)
-uv venv {project_name} --python 3.14
-source {project_name}/bin/activate
-```
-
-### Step 4: Install PyTorch (Community Build)
-
-**CRITICAL**: Must use community builds, not official wheels.
-
-**Option 1: AMD Nightlies (Recommended)**
-```bash
-pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch torchvision torchaudio
-```
-
-As of January 2026, this provides PyTorch 2.11.0a0+ with ROCm 7.11.0 support.
-
-**Option 2: TheRock Builds (Alternative)**
-Pre-built wheels from the official ROCm TheRock project:
-https://github.com/ROCm/TheRock/releases
-
-Look for `gfx1151` releases and install with `pip install <wheel_file>`.
-
-**Verify Installation**:
-```bash
-python -c "import torch; print('PyTorch:', torch.__version__); print('HIP:', torch.version.hip)"
-```
-
-Should show PyTorch 2.11+ and HIP 7.2+ with ROCm 7.x.
-
-### Step 5: Configure Environment Variables
-
-Create activation script in the conda environment:
+Set only the switch required by a tested feature:
 
 ```bash
-mkdir -p $CONDA_PREFIX/etc/conda/activate.d
-
-cat > $CONDA_PREFIX/etc/conda/activate.d/strix_halo_env.sh << 'EOF'
-#!/bin/bash
-
-# Core ROCm settings for Strix Halo (gfx1151)
-export HSA_OVERRIDE_GFX_VERSION=11.5.1
-export PYTORCH_ROCM_ARCH=gfx1151
-
-# Unified Memory Configuration - CRITICAL for accessing full memory
-export HSA_XNACK=1
-export HSA_FORCE_FINE_GRAIN_PCIE=1
-
-# Memory allocation settings
-export GPU_MAX_HEAP_SIZE=100
-export GPU_MAX_ALLOC_PERCENT=100
-
-# Device visibility
-export ROCR_VISIBLE_DEVICES=0
-export HIP_VISIBLE_DEVICES=0
-
-# Performance optimizations
-export ROCBLAS_USE_HIPBLASLT=1
-export AMD_LOG_LEVEL=0
-export HSA_CU_MASK=0xffffffffffffffff
-
-# ROCm 7.x stability fixes for APUs
-export HSA_ENABLE_SDMA=0  # Prevents checkerboard artifacts in VAE decodes
-
-# PyTorch memory management (recommended for 32GB+ workloads)
-export PYTORCH_HIP_ALLOC_CONF="backend:native,expandable_segments:True,garbage_collection_threshold:0.9"
-
-echo "✓ Strix Halo environment variables set"
-EOF
-
-chmod +x $CONDA_PREFIX/etc/conda/activate.d/strix_halo_env.sh
+export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
 ```
 
-Create deactivation script:
+Do not set these globally:
+
+- `HSA_OVERRIDE_GFX_VERSION`: hides an architecture/package mismatch.
+- `PYTORCH_ROCM_ARCH`: build-time/JIT target selection, not normal runtime setup.
+- `HSA_ENABLE_SDMA=0`: disables DMA copies; use only to isolate a reproduced bug.
+- `ROCR_VISIBLE_DEVICES` or `HIP_VISIBLE_DEVICES`: restrict devices only when asked.
+- `ROCBLAS_USE_HIPBLASLT=1`: leave backend selection on automatic unless a
+  workload-specific comparison proves otherwise.
+- `HSA_CU_MASK`, `HSA_XNACK`, `HSA_FORCE_FINE_GRAIN_PCIE`, and heap percentage
+  overrides: diagnostic controls, not baseline optimizations.
+
+See [performance features](docs/PERFORMANCE_FEATURES.md) for attention,
+`torch.compile`, BLAS, convolution, and dtype guidance.
+
+## Unified Memory
+
+Strix Halo has unified physical memory. Linux exposes overlapping VRAM and GTT
+accounting views; never add them together or describe their sum as usable RAM.
+
+Before changing memory configuration:
+
+1. Read physical RAM, current GTT, and VRAM separately.
+2. Estimate weights, KV cache, activations, allocator overhead, and host needs.
+3. Leave enough physical RAM for the OS and the workload's CPU allocations.
+4. Prefer AMD's `amd-ttm` helper over hand-written kernel parameters.
+5. Reboot and re-run verification after a change.
+
+Run the read-only advisor:
 
 ```bash
-mkdir -p $CONDA_PREFIX/etc/conda/deactivate.d
-
-cat > $CONDA_PREFIX/etc/conda/deactivate.d/strix_halo_env.sh << 'EOF'
-#!/bin/bash
-
-unset HSA_OVERRIDE_GFX_VERSION PYTORCH_ROCM_ARCH HSA_XNACK HSA_FORCE_FINE_GRAIN_PCIE
-unset GPU_MAX_HEAP_SIZE GPU_MAX_ALLOC_PERCENT ROCR_VISIBLE_DEVICES HIP_VISIBLE_DEVICES
-unset ROCBLAS_USE_HIPBLASLT AMD_LOG_LEVEL HSA_CU_MASK HSA_ENABLE_SDMA PYTORCH_HIP_ALLOC_CONF
-EOF
-
-chmod +x $CONDA_PREFIX/etc/conda/deactivate.d/strix_halo_env.sh
+./.claude/skills/strix-halo-setup/scripts/configure_gtt.sh
 ```
 
-### Step 6: Create Project Structure
-
-```bash
-mkdir -p {project_name}/{scripts,notebooks,data,models,tests}
-cd {project_name}
-```
-
-### Step 7: Copy Test Scripts
-
-Copy the test scripts from the skill directory:
-
-```bash
-cp .claude/skills/strix-halo-setup/scripts/*.py scripts/
-chmod +x scripts/*.py
-```
-
-### Step 8: Create Project README
-
-Create a README with project-specific information:
-
-```bash
-cat > README.md << 'EOF'
-# {Project Name}
-
-PyTorch project optimized for AMD Strix Halo (gfx1151).
-
-## Environment
-
-- **Hardware**: AMD Strix Halo (gfx1151)
-- **ROCm**: 6.4.2+
-- **PyTorch**: Community build for gfx1151
-- **Python**: 3.12
-
-## Setup
-
-```bash
-# Activate environment
-conda activate {project_name}
-
-# Verify GPU
-python scripts/test_gpu_simple.py
-
-# Test memory capacity
-python scripts/test_memory.py
-```
-
-## Hardware Capabilities
-
-- **Compute**: ~7 TFLOPS FP32, ~31 TFLOPS BF16 (with ROCm 7.x)
-- **Memory**: Up to 113GB GPU-accessible (with GTT configuration)
-- **Model Capacity**: 30B parameter models in FP16
-
-## Best Practices
-
-1. **Use BF16** for 1.6x speedup over FP32
-2. **Keep batch size small** (1-4) for inference
-3. **Data in VRAM is faster** than GTT memory
-4. **Monitor memory**: `rocm-smi --showmeminfo gtt`
-
-## Troubleshooting
-
-If compute fails with "HIP error: invalid device function":
-- You're using official PyTorch wheels (don't work with gfx1151)
-- Reinstall: `pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch`
-
-For more help, see `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md`
-
-Created: {date}
-EOF
-```
-
-### Step 9: Verify Installation
-
-Reactivate the environment to load variables:
-
-```bash
-conda deactivate
-conda activate {project_name}
-
-# Should see: "✓ Strix Halo environment variables set"
-```
-
-Run verification:
-
-```bash
-python scripts/test_gpu_simple.py
-```
-
-**Expected output:**
-```
-============================================================
-STRIX HALO GPU TEST
-============================================================
-✓ GPU detected: AMD Radeon Graphics
-  Memory: 113.2 GB
-  Compute test successful
-✓ ALL TESTS PASSED
-============================================================
-```
-
-### Step 10: Final Summary
-
-Tell the user:
-
-```
-✓ Setup complete! Your Strix Halo environment is ready.
-
-Project: {project_name}
-Location: {full_path}
-
-Next steps:
-  1. Test GPU: python scripts/test_gpu_simple.py
-  2. Test memory: python scripts/test_memory.py
-
-Hardware capabilities:
-  - 7 TFLOPS FP32 / 31 TFLOPS BF16 (ROCm 7.x)
-  - 113 GB GPU-accessible memory
-  - Can run 30B parameter models in FP16
-
-Activate anytime with: conda activate {project_name}
-```
-
-## Success Criteria
-
-All of these should pass:
-- ✓ PyTorch detects GPU
-- ✓ Compute operations succeed (no HIP errors)
-- ✓ Can allocate 30GB+ memory
-- ✓ BF16 operations work
-
-## Common Issues
-
-### Issue: "HIP error: invalid device function"
-
-**Cause**: Using official PyTorch wheels (don't work with gfx1151)
-
-**Solution**:
-```bash
-pip uninstall torch torchvision torchaudio
-pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch torchvision torchaudio
-```
-
-**Verify it worked**:
-```bash
-python -c "import torch; a=torch.tensor([1.0]).cuda(); print('✓ Works:', (a+1).item())"
-```
-
-### Issue: Out of memory below 30GB
-
-**Cause**: GTT not configured (limited to ~33GB)
-
-**Solution 1**: Upgrade to kernel 6.16.9+ (no configuration needed)
-
-**Solution 2**: For older kernels, configure GTT:
-```bash
-.claude/skills/strix-halo-setup/scripts/configure_gtt.sh
-```
-
-This adds kernel parameters to GRUB for GPU to access more system RAM.
-
-### Issue: GPU not detected
-
-**Cause**: User not in render/video groups
-
-**Solution**:
-```bash
-sudo usermod -aG render,video $USER
-# Log out and back in (or reboot)
-groups | grep -E "render|video"  # Verify
-```
-
-## Vulkan Setup (Alternative to PyTorch)
-
-If the user chose Vulkan for inference-only workloads:
-
-### Step V1: Install Vulkan Drivers
-
-```bash
-sudo apt install mesa-vulkan-drivers vulkan-tools
-```
-
-### Step V2: Verify Vulkan
-
-```bash
-vulkaninfo | grep "deviceName"
-# Should show: AMD Radeon Graphics or similar
-```
-
-### Step V3: Install Inference Tools
-
-**For llama.cpp**:
-```bash
-git clone https://github.com/ggerganov/llama.cpp
-cd llama.cpp
-make LLAMA_VULKAN=1
-```
-
-**For Ollama**:
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-### Step V4: Test Vulkan
-
-```bash
-# With llama.cpp
-./llama-cli -m /path/to/model.gguf -ngl 99 --gpu-backend vulkan
-
-# With Ollama
-ollama run llama2
-```
-
-### Vulkan Summary
-
-Tell the user:
-```
-✓ Vulkan setup complete!
-
-Backend: Vulkan (inference only)
-Use with: llama.cpp, Ollama, other Vulkan-enabled tools
-
-Note: Vulkan often provides better performance for inference than ROCm/HIP.
-For training or custom PyTorch code, set up PyTorch instead.
-```
-
----
-
-## References
-
-- **Troubleshooting**: `.claude/skills/strix-halo-setup/docs/TROUBLESHOOTING.md`
-- **GTT Configuration**: `.claude/skills/strix-halo-setup/docs/GTT_MEMORY_FIX.md`
-- **Community PyTorch**: https://github.com/ROCm/TheRock/releases
-
-## Notes
-
-- GTT configuration needed for 30B+ models on kernels before 6.16.9 (kernel 6.16.9+ has automatic UMA support)
-- Vulkan backend often provides better performance for inference
-- Use BF16 precision in PyTorch for better performance
-
-## ROCm 7.x Considerations
-
-**Benefits of ROCm 7.2+:**
-- Up to 5x performance improvement in image generation (ComfyUI, Flux, SDXL)
-- ~2.5x improvement in BF16 compute (31 TFLOPS vs 12 TFLOPS on ROCm 6.x)
-- Unified Windows/Linux release
-- Better long-term support path
-- JAX 0.8.0 support
-
-**Known Limitations on gfx1151 (as of ROCm 7.2):**
-- **hipBLASLt**: Falls back to hipBLAS (slower) due to unsupported architecture
-- **LLM Decode**: Memory-copy bound (~92-95% time in hipMemcpyWithStream), limiting token throughput
-- **Flash Attention**: May require `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1` and still has issues
-
-**Deprecations in ROCm 7.2:**
-- HIPCC is deprecated; AMD Clang should be used directly for compilation
-- ROCTracer, ROCProfiler, rocprof, rocprofv2 are deprecated; use ROCprofiler-SDK and AMD SMI instead
-
-**Recommended Environment Variables for ROCm 7.x:**
-```bash
-export HSA_ENABLE_SDMA=0  # Prevents artifacts in VAE decodes
-export PYTORCH_HIP_ALLOC_CONF="backend:native,expandable_segments:True,garbage_collection_threshold:0.9"
-```
+See [GTT memory configuration](docs/GTT_MEMORY_FIX.md). Do not claim a model is
+supported from a synthetic allocation; run a representative inference or
+training step with the intended precision and context length.
+
+## Interpreting Verification
+
+- `verify_system.sh` checks host prerequisites without modifying the machine.
+- `verify_pytorch.py` launches bounded real kernels for FP32, FP16, BF16,
+  matrix multiplication, MIOpen convolution/backward, SDPA, forced flash SDPA,
+  `torch.compile`, and a touched allocation.
+- Optional feature warnings do not invalidate basic PyTorch compute. A feature
+  requested through `--require` must pass or the script exits nonzero.
+- BF16 passing locally is useful evidence, but AMD's ROCm 7.2.1 Ryzen matrix
+  officially lists FP16 validation for gfx1151.
+- A flash-attention pass proves PyTorch dispatched the forced SDPA backend for
+  the tested shape. It does not prove every model shape uses that backend.
+
+## Troubleshooting Order
+
+1. Save the exact command and complete error.
+2. Run both verifiers in the affected environment.
+3. Confirm the installed wheel contains a gfx1151 device package.
+4. Remove inherited ROCm/HSA overrides and retry in a new process.
+5. Compare against a fresh environment on the other installation track.
+6. Check TheRock's current test status and issues before changing the host.
+
+Use [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for symptom-specific fixes.
+
+## Boundaries
+
+- Focus on Linux PyTorch setup and validation, not model-specific scaffolding.
+- Treat TheRock versions and feature status as time-sensitive; query the index
+  when installing rather than copying a version from this document.
+- Do not add benchmark numbers or generic model-size compatibility tables.
+- Do not modify BIOS, kernel boot parameters, or system memory without explicit
+  user approval and a rollback plan.

@@ -2,30 +2,78 @@
 
 All notable changes to the Strix Halo Skills project will be documented in this file.
 
-## [1.1.1] - January 23, 2026
+## [2.0.0] - July 14, 2026
 
-### ROCm 7.2 Support and Verified Performance
+### Rebuilt Installation and Capability Validation
+
+**Breaking changes:**
+
+- Replaced the retired per-family TheRock install with the unified multi-arch
+  index and the `device-gfx1151` package extras.
+- Removed blanket HSA, device-visibility, SDMA, allocator, and BLAS environment
+  overrides from the baseline setup.
+- Removed synthetic model-capacity tests and the benchmark script; their
+  allocation results did not prove that a model or optimized kernel executed.
+- Changed GTT configuration from a hard-coded system modification to a
+  read-only advisor using AMD's `amd-ttm` workflow.
 
 **Added:**
-- ROCm 7.x compatibility documentation and environment variables
-- `HSA_ENABLE_SDMA=0` environment variable to prevent VAE decode artifacts
-- `PYTORCH_HIP_ALLOC_CONF` settings for better memory management
-- New troubleshooting entries for ROCm 7.x specific issues (Problems 6-9)
-- ROCm 7.x considerations section in SKILL.md
 
-**Updated:**
-- Supported ROCm versions: now "6.4.4+ or 7.x"
-- PyTorch installation instructions with January 2026 nightly info (2.11.0a0+)
-- Changed community builds reference from scottt to official ROCm/TheRock
-- Verified BF16 performance: **31 TFLOPS** (up from 12 TFLOPS on ROCm 6.x)
-- Hardware capabilities documentation with verified numbers
-- Fixed path typos in TROUBLESHOOTING.md and README.md
+- Separate AMD-supported ROCm 7.2.1/PyTorch 2.9.1 and experimental TheRock
+  nightly installation tracks.
+- A bounded `verify_pytorch.py` probe for gfx1151, FP16, BF16, convolution
+  forward/backward, SDPA, forced flash SDPA, `torch.compile`, and touched memory.
+- Feature-specific documentation for AOTriton, Triton/Inductor, precision,
+  BLAS selection, convolution, allocator behavior, and SDMA.
+- Environment version capture and nightly rollback guidance.
 
-**Documented:**
-- ROCm 7.2 benefits (up to 5x in image generation, 2.5x in BF16 compute)
-- Known gfx1151 limitations (hipBLASLt fallback, memcpy-bound LLM decode)
-- HIPCC deprecation (use AMD Clang directly)
-- ROCTracer/ROCProfiler deprecation (use ROCprofiler-SDK)
+**Corrected:**
+
+- Unified VRAM and GTT mappings are now reported separately and never summed.
+- Kernel checks account for Ubuntu OEM backports and the upstream Linux 6.18.4
+  fixes instead of assuming every newer-looking kernel has them.
+- Official AMD gfx1151 support is documented; the previous claim that all
+  official wheels fail is no longer current.
+- Model support is no longer inferred from a successful tensor allocation.
+
+**Hardware validation (TheRock track):**
+
+- Host: AMD Ryzen AI MAX+ 395 (`gfx1151`), 64 GiB RAM, Ubuntu 24.04
+- Kernel: 6.17.0-1028-oem
+- System ROCm: 7.2.0
+- Fresh Python 3.12 environment: PyTorch 2.12.0, torchvision 0.27.0,
+  torchaudio 2.11.0, Triton 3.7.1, and ROCm 7.15.0 development packages dated
+  July 12, 2026
+- Installed and verified `rocm-sdk-device-gfx1151` and
+  `amd-torch-device-gfx1151`; `pip check` reported no broken requirements
+- Passed real gfx1151 kernels for FP32, FP16, BF16, convolution
+  forward/backward, SDPA, forced flash SDPA forward/backward, Inductor
+  `torch.compile`, and touched memory with no runtime overrides; GEMM,
+  convolution, and attention outputs matched bounded FP32 CPU references
+- Passed the same forced flash test with
+  `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1`; the ROCm profiler recorded flash
+  forward/backward operators plus `attn_fwd.kd` and `bwd_kernel_fuse.kd`
+- Passed torchvision GPU NMS; torchaudio imported; TheRock `rocm-sdk test`
+  passed all 19 tests; MIOpen runtime reported 3.5.2
+- Physical RAM, GTT, and VRAM mappings were reported separately as 61.44,
+  30.72, and 64.00 GiB; no TTM, BIOS, or boot configuration was changed
+- The AMD-supported track is based on AMD's published compatibility matrix and
+  exact wheel set; it was not reinstalled during this July 14 hardware run
+
+Pre-2.0 entries below are retained as release history. Their allocation-only
+model estimates and microbenchmarks were not end-to-end model validation and
+are superseded by the v2.0 capability checks and memory-accounting rules.
+
+## [1.1.1] - January 23, 2026
+
+### ROCm 7.2 Documentation Update
+
+- Added ROCm 7.x notes, troubleshooting, and then-current environment settings.
+- Updated the then-current per-family nightly instructions and TheRock links.
+- Recorded BF16 and FP32 microbenchmarks, since removed from the maintained skill
+  because they age quickly and do not predict application performance.
+- Superseded in v2.0: blanket runtime overrides and the per-family install are no
+  longer the baseline.
 
 **Tested Configuration:**
 - ROCm: 7.2.0 (system) + 7.11.0 nightlies (PyTorch)
@@ -38,55 +86,12 @@ All notable changes to the Strix Halo Skills project will be documented in this 
 
 ### Initial Release
 
-**Verified Capabilities:**
-- 30B parameter models in FP16 (tested up to 62.8 GB memory usage)
-- 12 TFLOPS BF16 compute, 7 TFLOPS FP32
-- 229 GB/s write bandwidth, 201 GB/s copy bandwidth
-- 113 GB GPU-accessible memory with GTT configuration
-
-### Added
-
-**Claude Code Skills:**
-- `strix-halo-setup` - Complete automated project setup
-- `QUICK_REFERENCE` - Quick command reference
-- `STRIX_HALO_COMPLETE_GUIDE` - Comprehensive documentation access
-
-**Scripts:**
-- `setup_new_project.sh` - Automated project creation with conda environment
-- `configure_gtt.sh` - GTT memory configuration helper
-- `scripts/test_gpu_simple.py` - Quick GPU verification
-- `scripts/test_memory.py` - Progressive memory allocation testing
-- `scripts/test_llm_memory.py` - LLM capacity simulation testing
-- `scripts/amd_benchmark_safe.py` - Safe performance benchmarking
-
-**Documentation:**
-- `STRIX_HALO_COMPLETE_GUIDE.md` - Complete setup guide with verified October 2025 results
-- `GTT_MEMORY_FIX.md` - GTT memory configuration details
-- `TROUBLESHOOTING.md` - Common issues and solutions
-- `GETTING_STARTED.md` - First-time user guide
-- `USAGE_IN_OTHER_PROJECTS.md` - How to use skills in other projects
-- `PUBLISHING_GUIDE.md` - How to publish and share the repository
-
-### Key Features
-
-**PyTorch Installation:**
-- Documents that official PyTorch wheels don't work with gfx1151
-- Provides working installation via AMD nightlies: `pip install --index-url https://rocm.nightlies.amd.com/v2/gfx1151/ --pre torch`
-- Alternative community builds from [@scottt](https://github.com/scottt/rocm-TheRock)
-
-**GTT Configuration:**
-- Kernel parameters for 108GB GTT: `amdttm.pages_limit=27648000`
-- Supports up to 128GB GTT on systems with sufficient RAM
-- Automatic configuration via `configure_gtt.sh`
-
-**Environment Setup:**
-- Automatic conda environment creation
-- Environment variables configured via activation scripts
-- Includes all necessary ROCm optimizations (HSA_XNACK, ROCBLAS_USE_HIPBLASLT, etc.)
-
-**Alternative Backends:**
-- Documentation for Vulkan backend (often faster for inference)
-- Performance comparison between Vulkan and ROCm/HIP
+- Added the initial `strix-halo-setup` skill, environment scaffolding, GTT
+  helper, troubleshooting, allocation probes, and microbenchmark script.
+- Documented the then-current community gfx1151 wheels and Vulkan alternative.
+- Allocation probes estimated model-size memory needs but did not load or run
+  those models. Their capacity claims and summed memory accounting are
+  superseded by v2.0.
 
 ### Tested Configuration
 
@@ -96,29 +101,8 @@ All notable changes to the Strix Halo Skills project will be documented in this 
 - **Linux Kernel**: 6.14.0-33-generic
 - **OS**: Ubuntu 24.04 LTS
 - **System RAM**: 64 GB
-- **GTT**: Configured to 113 GB
-
-### Performance Results
-
-| Benchmark | Result |
-|-----------|--------|
-| FP32 Compute (1024x1024) | 7.77 TFLOPS |
-| BF16 Compute (1024x1024) | 12.32 TFLOPS |
-| FP32 Compute (2048x2048) | 6.95 TFLOPS |
-| BF16 Compute (2048x2048) | 12.03 TFLOPS |
-| Memory Write Bandwidth | 229 GB/s |
-| Memory Copy Bandwidth | 201 GB/s |
-| 7B Model (FP16) | ✅ 14.0 GB allocated |
-| 13B Model (FP16) | ✅ 26.5 GB allocated |
-| 30B Model (FP16) | ✅ 60.8 GB allocated |
-| 65B Model (FP16) | ❌ Exceeds available RAM |
-
-### Known Limitations
-
-- Official PyTorch wheels don't work (requires community builds)
-- Flash Attention not working on gfx1151 as of ROCm 6.5
-- Compute efficiency around 21-26% of theoretical peak
-- 65B+ models require more than 64GB system RAM
+- **Validation method**: synthetic allocations and microbenchmarks only;
+  superseded by v2.0's bounded kernel and workload-specific validation policy
 
 ### Credits
 
@@ -129,26 +113,7 @@ All notable changes to the Strix Halo Skills project will be documented in this 
 
 ---
 
-## Future Releases
-
-### Planned for Future Versions
-
-- Examples directory with working inference scripts
-- Windows setup instructions (ROCm 7.2+ has unified Windows/Linux release)
-- Model compatibility matrix
-- Performance tuning guide
-- Video walkthrough
-- hipBLASLt native gfx1151 support (pending AMD updates)
-
-### How to Report Issues
+## How to Report Issues
 
 - GitHub Issues: https://github.com/ianbarber/strix-halo-skills/issues
 - Include: ROCm version, PyTorch version, error messages, system specs
-
-### How to Contribute
-
-See `PUBLISHING_GUIDE.md` for information on contributing improvements.
-
----
-
-*Note: Semantic versioning will be used for future releases. This initial release is 1.0.0 as it represents a complete, tested, and documented solution.*
